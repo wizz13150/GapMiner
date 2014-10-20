@@ -1,29 +1,29 @@
 # GapMiner - A standalone Gapcoin (GAP) CPU rpc miner
 ---
 <br/>
-## So whats the purpose of an standalone rpc miner? 
+## So what's the purpose of a standalone rpc miner? 
 
 
-  * GapMiner is fully open source (GPLv3) and (hopefully)
-    well documented, to give developper a good start into the
+  * GapMiner is completely open source (GPLv3) and (hopefully)
+    well documented, giving developers a good start into the
     pGap algorithm (Gapcoins prime gap based hashing algorithm).
 
   * simplicity and little dependencies (pure C++ code and only 
     pthread, openssl, curl, jansson, gmp and mpfr dependencies).
 
-  * speed, at the moment GapMiner has no speed improvements over Gapcoin,
-    but in future this houpfully changes.
+  * speed (at the moment, GapMiner has no speed improvements in comparison with Gapcoin,
+    but this is hopefully going to change.)
 
 
 
 ## get it running
 ---
 
-First of all keep in mind that GapMiner still has alpha qualities and 
-doesn't claims to be the fastest CPU miner out there, the main focus
-is read- and understandability of the Gapcoin mining algorithm!
+First of all, keep in mind that GapMiner still has alpha qualities and 
+doesn't claim to be the fastest CPU miner out there. The focal point
+is the readability and understandability of the Gapcoin mining algorithm!
 
-Also it's currently Linux only, sorry.
+Plus, currently it's only for Linux. Sorry.
 
 ### required libraries
   - pthread
