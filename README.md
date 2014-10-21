@@ -59,7 +59,7 @@ Plus, currently it's only for Linux. Sorry.
 
 #### example:
 
-`gapminer -o 127.0.0.1 -p  -u rpcuser -x rpcpassword`
+`gapminer -o 127.0.0.1 -p 31397 -u rpcuser -x rpcpassword`
 
 ### advanced
 

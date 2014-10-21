@@ -177,10 +177,6 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  /* exit without failure */
-  printf("Congratulations, you are well prepared for the launch.\n");
-  exit(EXIT_SUCCESS);
-
   init_signal();
 
 
