@@ -59,14 +59,13 @@
 #include <boost/asio.hpp>
 #include <pthread.h>
 #include <jansson.h>
-#include "NetProtocol.h"
 #include "Miner.h"
 #include "BlockHeader.h"
 
 using boost::asio::ip::tcp;
 using namespace std;
 
-class Stratum : NetProtocol {
+class Stratum {
 
   public:
 

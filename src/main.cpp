@@ -40,7 +40,7 @@ using namespace std;
 /* indicates if program should continue running */
 static bool running = true;
 
-/* indicates that we are waiting for gapcoind */
+/* indicates that we are waiting for server */
 static bool waiting = false;
 
 /* the miner */
@@ -107,7 +107,7 @@ void *getwork_thread(void *arg) {
   while (header == NULL) {
     waiting = true;
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "waiting for gapcoind ..." << endl;
+    cout << get_time() << "waiting for server ..." << endl;
     pthread_mutex_unlock(&io_mutex);
     sleep(5);
 
@@ -115,6 +115,15 @@ void *getwork_thread(void *arg) {
     header = rpc->getwork();
     waiting = false;
   }
+
+  pthread_mutex_lock(&io_mutex);
+  cout.precision(7);
+  cout << get_time() << "Got new target: ";
+  cout << fixed << (((double) header->target) / TWO_POW48) << " @ ";
+  cout << fixed << (((double) header->difficulty) / TWO_POW48) << endl;
+  pthread_mutex_unlock(&io_mutex);
+
+  bool longpoll = rpc->has_long_poll();
 
   uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 20);
   header->shift  = shift;
@@ -128,15 +137,16 @@ void *getwork_thread(void *arg) {
   time_t work_time = time(NULL);
 
   while (running) {
-    sleep(sec);
+    if (!longpoll)
+      sleep(sec);
 
-    BlockHeader *new_header = rpc->getwork();
+    BlockHeader *new_header = rpc->getwork(longpoll);
 
     while (new_header == NULL) {
       waiting = true;
 
       pthread_mutex_lock(&io_mutex);
-      cout << get_time() << "waiting for gapcoind ..." << endl;
+      cout << get_time() << "waiting for server ..." << endl;
       pthread_mutex_unlock(&io_mutex);
 
       sleep(sec);
@@ -146,9 +156,12 @@ void *getwork_thread(void *arg) {
       waiting = false;
     }
   
-    new_header->shift       = shift;
+    new_header->shift = shift;
 
-    if (!header->equal_block_height(new_header) || time(NULL) >= work_time + 180) {
+    if (longpoll || 
+        !header->equal_block_height(new_header) || 
+        time(NULL) >= work_time + 180) {
+
       miner->update_header(new_header);
 
       delete header;
@@ -157,8 +170,10 @@ void *getwork_thread(void *arg) {
 
       if (!opts->has_quiet()) {
         pthread_mutex_lock(&io_mutex);
+        cout.precision(7);
         cout << get_time() << "Got new target: ";
-        cout << (((double) header->difficulty) / TWO_POW48) << endl;
+        cout << fixed << (((double) header->target) / TWO_POW48) << " @ ";
+        cout << fixed << (((double) header->difficulty) / TWO_POW48) << endl;
         pthread_mutex_unlock(&io_mutex);
       }
     }
@@ -209,7 +224,7 @@ int main(int argc, char *argv[]) {
   /* 1 thread default */
   int n_threads = (opts->has_threads() ? atoi(opts->get_threads().c_str()) : 1);
 
-  /* default 5 sec timout */
+  /* default 5 sec timeout */
   int timeout = (opts->has_threads() ? atoi(opts->get_timeout().c_str()) : 5);
 
   /* default shift 20 */
@@ -259,10 +274,10 @@ int main(int argc, char *argv[]) {
       cout << get_time();
       cout << "pps: "    << (int) miner->primes_per_sec();
       cout << " / "      << (int) miner->avg_primes_per_sec();
-      cout << "  10g/h " << miner->gaps10_per_hour();
-      cout << " / "      << miner->avg_gaps10_per_hour();
-      cout << "  15g/h " << miner->gaps15_per_hour();
-      cout << " / "      << miner->avg_gaps15_per_hour() << endl;
+      cout << "  10g/h " << (int) miner->gaps10_per_hour();
+      cout << " / "      << (int) miner->avg_gaps10_per_hour();
+      cout << "  15g/h " << (int) miner->gaps15_per_hour();
+      cout << " / "      << (int) miner->avg_gaps15_per_hour() << endl;
       pthread_mutex_unlock(&io_mutex);
     }
   }

@@ -42,11 +42,24 @@ bool Rpc::initialized = false;
 /* indicates if curl was initialized */
 bool Rpc::curl_initialized = false;
 
+/* rpc timeout */
+int Rpc::timeout = 5;
+
+/* the LongPoll object of this */
+Rpc::LongPoll Rpc::longpoll = Rpc::LongPoll();
+
+/* server url */
+string Rpc::server_url = "";
+
 /* string stream for receiving */
 stringstream *Rpc::recv_ss = new stringstream;
 
-/* curl session handle */
-CURL *Rpc::curl = NULL;
+/* curl receive session handle */
+CURL *Rpc::curl_recv = NULL;
+
+/* curl send session handle */
+CURL *Rpc::curl_send = NULL;
+
 
 /* get work rpc command */
 string Rpc::getwork_rpccmd = "{\"jsonrpc\": \"1.0\", "
@@ -55,7 +68,7 @@ string Rpc::getwork_rpccmd = "{\"jsonrpc\": \"1.0\", "
                              "\"params\": [] }";
 
 /**
- * curl callback function to send rpc commands to gapcoind
+ * curl callback function to send rpc commands to the server
  */
 size_t curl_read(void *ptr, size_t size, size_t nmemb, void *user_data) {
 
@@ -76,13 +89,37 @@ size_t curl_read(void *ptr, size_t size, size_t nmemb, void *user_data) {
 }
 
 /**
- * curl callback function to receive rpc responses from gapcoind
+ * curl callback function to receive rpc responses from the server
  */
 size_t curl_write(char *ptr, size_t size, size_t nmemb, void *user_data) {
   stringstream *ss = (stringstream *) user_data;
   
   if ((size * nmemb) > 0)
     ss->write(ptr, size * nmemb);
+
+  return size * nmemb;
+}
+
+/**
+ * curl callback function for receive the http header
+ */
+size_t curl_header(char *ptr, size_t size, size_t nmemb, void *user_data) {
+
+  static string lp_str("X-Long-Polling: ");
+  Rpc::LongPoll *longpoll = (Rpc::LongPoll *) user_data;
+
+  string str(ptr, size * nmemb);
+  size_t start = str.find(lp_str);
+
+  if (start != string::npos && start < nmemb * size - lp_str.length()) {
+    start += lp_str.length();
+
+    size_t end = str.find("\r\n", start);
+    if (end != string::npos && end < nmemb * size) {
+        longpoll->supported = true;
+        longpoll->url = str.substr(start, end - start);
+    }
+  }
 
   return size * nmemb;
 }
@@ -95,22 +132,43 @@ bool Rpc::init_curl(string userpass, string url, int timeout) {
 
   curl_global_init(CURL_GLOBAL_ALL);
 
-  curl = curl_easy_init();
-  if(curl) {
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  	curl_easy_setopt(curl, CURLOPT_ENCODING, "");
-	  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
-	  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-	  curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);
-	  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write);
-	  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) recv_ss);
-  	curl_easy_setopt(curl, CURLOPT_READFUNCTION, curl_read);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-	  curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
-	  curl_easy_setopt(curl, CURLOPT_POST, 1);
-		curl_easy_setopt(curl, CURLOPT_USERPWD, userpass.c_str());
-		curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+  curl_recv = curl_easy_init();
+  curl_send = curl_easy_init();
+  if(curl_recv && curl_send) {
+    curl_easy_setopt(curl_recv, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl_recv, CURLOPT_ENCODING, "");
+    curl_easy_setopt(curl_recv, CURLOPT_FAILONERROR, 1);
+    curl_easy_setopt(curl_recv, CURLOPT_NOSIGNAL, 1);
+    curl_easy_setopt(curl_recv, CURLOPT_TCP_NODELAY, 1);
+    curl_easy_setopt(curl_recv, CURLOPT_WRITEFUNCTION, curl_write);
+    curl_easy_setopt(curl_recv, CURLOPT_WRITEDATA, (void *) recv_ss);
+    curl_easy_setopt(curl_recv, CURLOPT_READFUNCTION, curl_read);
+    curl_easy_setopt(curl_recv, CURLOPT_HEADERDATA, &Rpc::longpoll);
+    curl_easy_setopt(curl_recv, CURLOPT_HEADERFUNCTION, curl_header);
+    curl_easy_setopt(curl_recv, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl_recv, CURLOPT_TIMEOUT, timeout);
+    curl_easy_setopt(curl_recv, CURLOPT_POST, 1);
+    curl_easy_setopt(curl_recv, CURLOPT_USERPWD, userpass.c_str());
+    curl_easy_setopt(curl_recv, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
 
+    curl_easy_setopt(curl_send, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl_send, CURLOPT_ENCODING, "");
+    curl_easy_setopt(curl_send, CURLOPT_FAILONERROR, 1);
+    curl_easy_setopt(curl_send, CURLOPT_NOSIGNAL, 1);
+    curl_easy_setopt(curl_send, CURLOPT_TCP_NODELAY, 1);
+    curl_easy_setopt(curl_send, CURLOPT_WRITEFUNCTION, curl_write);
+    curl_easy_setopt(curl_send, CURLOPT_WRITEDATA, (void *) recv_ss);
+    curl_easy_setopt(curl_send, CURLOPT_READFUNCTION, curl_read);
+    curl_easy_setopt(curl_send, CURLOPT_HEADERDATA, &Rpc::longpoll);
+    curl_easy_setopt(curl_send, CURLOPT_HEADERFUNCTION, curl_header);
+    curl_easy_setopt(curl_send, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl_send, CURLOPT_TIMEOUT, timeout);
+    curl_easy_setopt(curl_send, CURLOPT_POST, 1);
+    curl_easy_setopt(curl_send, CURLOPT_USERPWD, userpass.c_str());
+    curl_easy_setopt(curl_send, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+
+    Rpc::server_url = url;
+    Rpc::timeout    = timeout;
     curl_initialized = true;
     return true;
   }
@@ -140,33 +198,60 @@ Rpc::~Rpc() { }
 
 /**
  * Request new Work from gapcoin daemon
+ * do_lp indicates whether to make a long poll request or not.
  */
-BlockHeader *Rpc::getwork() {
+BlockHeader *Rpc::getwork(bool do_lp) {
 
   /* building http header */
-	char content_len[64];
+  char content_len[64];
   struct curl_slist *header = NULL;
+  static bool init_msg = false;
 
-	sprintf(content_len, "Content-Length: %lu", getwork_rpccmd.length());
-	header = curl_slist_append(header, "Content-Type: application/json");
-	header = curl_slist_append(header, content_len);
-	header = curl_slist_append(header, "User-Agent: " USER_AGENT);
-	header = curl_slist_append(header, "Accept:"); /* disable Accept hdr*/
-	header = curl_slist_append(header, "Expect:"); /* disable Expect hdr*/
+  sprintf(content_len, "Content-Length: %lu", getwork_rpccmd.length());
+  header = curl_slist_append(header, "Content-Type: application/json");
+  header = curl_slist_append(header, content_len);
+  header = curl_slist_append(header, "User-Agent: " USER_AGENT);
+  header = curl_slist_append(header, "Accept:"); /* disable Accept hdr*/
+  header = curl_slist_append(header, "Expect:"); /* disable Expect hdr*/
 
-  if(curl) {
-    curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &getwork_rpccmd);
-	  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header);
+  if(curl_recv) {
+    if (do_lp) {
+      curl_easy_setopt(curl_recv, CURLOPT_TIMEOUT, 60);
+ 
+      /* url starts with / */
+      if (longpoll.url.rfind("/") == 0)
+        curl_easy_setopt(curl_recv, CURLOPT_URL, (server_url + longpoll.url).c_str());
+      else
+        curl_easy_setopt(curl_recv, CURLOPT_URL, longpoll.url.c_str());
+        
+    } else {
+      curl_easy_setopt(curl_recv, CURLOPT_TIMEOUT, timeout);
+      curl_easy_setopt(curl_recv, CURLOPT_URL, server_url.c_str());
+    }
+    curl_easy_setopt(curl_recv, CURLOPT_READDATA, (void *) &getwork_rpccmd);
+    curl_easy_setopt(curl_recv, CURLOPT_HTTPHEADER, header);
   } else
     return NULL;
 
   CURLcode res;
 
   /* Perform the request, res will get the return code */ 
-  res = curl_easy_perform(curl);
+  res = curl_easy_perform(curl_recv);
+
+  if (!init_msg && longpoll.supported) {
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "Server supports longpoll" << endl; 
+    pthread_mutex_unlock(&io_mutex);
+    init_msg = true;
+  }
+
+  /* long poll timed out make normal getwork request */
+  if (res == CURLE_OPERATION_TIMEDOUT && do_lp) {
+    return getwork(false);
+  }
 
   /* Check for errors */ 
-  if(res != CURLE_OK) {
+  if(res != CURLE_OK)  {
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "curl_easy_perform() failed: "; 
     cout << curl_easy_strerror(res) << endl;
@@ -192,7 +277,7 @@ BlockHeader *Rpc::getwork() {
 
   if (!json_is_object(root)) {
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "can not parse gapcoind response" << endl;
+    cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
@@ -201,7 +286,7 @@ BlockHeader *Rpc::getwork() {
 
   if (!json_is_object(root)) {
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "can not parse gapcoind response" << endl;
+    cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
@@ -209,7 +294,7 @@ BlockHeader *Rpc::getwork() {
   tdiff = json_object_get(root, "difficulty");
   if (!json_is_integer(tdiff)) {
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "can not parse gapcoind difficulty" << endl;
+    cout << get_time() << "can not parse server difficulty" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(tdiff);
     return NULL;
@@ -221,7 +306,7 @@ BlockHeader *Rpc::getwork() {
   root = json_object_get(root, "data");
   if (!json_is_string(root)) {
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "can not parse gapcoind response" << endl;
+    cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
@@ -249,27 +334,27 @@ bool Rpc::sendwork(BlockHeader *header) {
   data << "\"] }";
   
   /* building http header */
-	char content_len[64];
+  char content_len[64];
   struct curl_slist *httphead = NULL;
   string hex = data.str();
 
-	sprintf(content_len, "Content-Length: %lu", hex.length());
-	httphead = curl_slist_append(httphead, "Content-Type: application/json");
-	httphead = curl_slist_append(httphead, content_len);
-	httphead = curl_slist_append(httphead, "User-Agent: " USER_AGENT);
-	httphead = curl_slist_append(httphead, "Accept:"); /* disable Accept hdr*/
-	httphead = curl_slist_append(httphead, "Expect:"); /* disable Expect hdr*/
+  sprintf(content_len, "Content-Length: %lu", hex.length());
+  httphead = curl_slist_append(httphead, "Content-Type: application/json");
+  httphead = curl_slist_append(httphead, content_len);
+  httphead = curl_slist_append(httphead, "User-Agent: " USER_AGENT);
+  httphead = curl_slist_append(httphead, "Accept:"); /* disable Accept hdr*/
+  httphead = curl_slist_append(httphead, "Expect:"); /* disable Expect hdr*/
 
-  if(curl) {
-    curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &hex);
-	  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, httphead);
+  if(curl_send) {
+    curl_easy_setopt(curl_send, CURLOPT_READDATA, (void *) &hex);
+    curl_easy_setopt(curl_send, CURLOPT_HTTPHEADER, httphead);
   } else
     return false;
 
   CURLcode res;
 
   /* Perform the request, res will get the return code */ 
-  res = curl_easy_perform(curl);
+  res = curl_easy_perform(curl_send);
 
   /* Check for errors */ 
   if(res != CURLE_OK) {
@@ -298,7 +383,7 @@ bool Rpc::sendwork(BlockHeader *header) {
 
   if (!json_is_object(root)) {
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "can not parse gapcoind response" << endl;
+    cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
@@ -307,7 +392,7 @@ bool Rpc::sendwork(BlockHeader *header) {
 
   if (!json_is_boolean(root)) {
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "can not parse gapcoind response" << endl;
+    cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;

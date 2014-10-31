@@ -162,13 +162,14 @@ void *ShareProcessor::share_processor(void *args) {
 
   queue<BlockHeader *> *shares = (queue<BlockHeader *> *) args;
   BlockHeader *cur;
-  NetProtocol *net = NULL;
-  bool stratum = Opts::get_instance()->has_stratum();
+  Rpc *rpc = NULL;
+  Stratum *stratum = NULL;
+  bool has_stratum = Opts::get_instance()->has_stratum();
 
-  if (stratum)
-    net = (NetProtocol *) Stratum::get_instance();
+  if (has_stratum)
+    stratum = Stratum::get_instance();
   else
-    net = (NetProtocol *) Rpc::get_instance();
+    rpc = Rpc::get_instance();
 
   while (initialized) {
     
@@ -190,11 +191,15 @@ void *ShareProcessor::share_processor(void *args) {
       pthread_mutex_unlock(&queue_mutex);
     }
 
-    /* submit share */
-    bool accepted = net->sendwork(cur);
 
-    /* send the share to gapcoind */
-    if (!stratum) {
+    /* send the share to server */
+    if (has_stratum) {
+      stratum->sendwork(cur);
+    } else {
+
+      /* submit share */
+      bool accepted = rpc->sendwork(cur);
+
       pthread_mutex_lock(&io_mutex);
       cout.precision(7);
       cout << get_time();

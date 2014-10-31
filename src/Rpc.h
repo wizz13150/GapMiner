@@ -22,11 +22,10 @@
 #include <curl/curl.h>
 #include <sstream>
 #include "BlockHeader.h"
-#include "NetProtocol.h"
 
 #define USER_AGENT "GapMiner"
 
-class Rpc : NetProtocol {
+class Rpc {
 
   public:
 
@@ -38,8 +37,9 @@ class Rpc : NetProtocol {
 
     /**
      * Request new Work from the gapcoin daemon
+     * do_lp indicates whether to make a long poll request or not.
      */
-    BlockHeader *getwork();
+    BlockHeader *getwork(bool do_lp = false);
 
     /**
      * send processed work to the gapcoin daemon
@@ -53,10 +53,30 @@ class Rpc : NetProtocol {
      */
     static bool init_curl(string userpass, string url, int timeout = 5);
 
+    /* subclass for storing long poll informations */
+    class LongPoll {
+      public: 
+        bool supported;
+        string url;
+
+        LongPoll() {
+          supported = false;
+          url = "";
+        }
+    };
+
+    /* returns whether current connection supports long pool */
+    bool has_long_poll() { return Rpc::longpoll.supported; }
+
+
   private:
 
-    /* curl session handle */
-    static CURL *curl;
+    /* curl receive session handle */
+    static CURL *curl_recv;
+
+    /* curl send session handle */
+    static CURL *curl_send;
+
 
     /* private constructor to allow only one instance */
     Rpc();
@@ -86,11 +106,9 @@ class Rpc : NetProtocol {
     /* string stream for receiving */
     static stringstream *recv_ss;
     
-    /* curl read function */
-    static size_t getwork(void *ptr, 
-                          size_t size, 
-                          size_t nmemb, 
-                          void *user_data);
-    
+    /* the LongPoll object of this */
+    static LongPoll longpoll;
 
+    /* server url */
+    static string server_url;
 };

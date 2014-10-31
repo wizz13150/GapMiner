@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <pthread.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <iostream>
 #include <boost/asio.hpp>
 #include <jansson.h>
