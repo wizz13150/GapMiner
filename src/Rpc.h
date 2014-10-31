@@ -22,10 +22,11 @@
 #include <curl/curl.h>
 #include <sstream>
 #include "BlockHeader.h"
+#include "NetProtocol.h"
 
 #define USER_AGENT "GapMiner"
 
-class Rpc {
+class Rpc : NetProtocol {
 
   public:
 
@@ -50,7 +51,7 @@ class Rpc {
      * initialize curl with the given 
      * username, password, url, and port
      */
-    static bool init_curl(string userpass, string url);
+    static bool init_curl(string userpass, string url, int timeout = 5);
 
   private:
 

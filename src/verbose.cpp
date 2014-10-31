@@ -27,9 +27,10 @@
 #include <stdarg.h>
 #include <time.h>
 #include <gmp.h>
+#include <string>
 
-/* print current time */
-static void print_time(FILE *out = stdout) {
+/* rerurn the current time */
+std::string get_time() {
   time_t timer;
   char buffer[25];
   struct tm* tm_info;
@@ -37,65 +38,12 @@ static void print_time(FILE *out = stdout) {
   time(&timer);
   tm_info = localtime(&timer);
 
-  strftime(buffer, 25, "\r[%Y-%m-%d %H:%M:%S]", tm_info);
-  fprintf(out, "%s ", buffer);
+  strftime(buffer, 25, "\r[%Y-%m-%d %H:%M:%S] ", tm_info);
+  return std::string(buffer);
 }
 
 /**
  * mutex to avoid mutual exclusion by writing output
  */
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-/**
- * print an errno message 
- */
-void errno_msg(char *msg) {
-
-  pthread_mutex_lock(&mutex);
-  print_time(stderr);
-  perror(msg);
-  pthread_mutex_unlock(&mutex);
-}
-
-/**
- * print an error message 
- */
-void error_msg(char *format, ...) {
-
-  pthread_mutex_lock(&mutex);
-
-  va_list args;
-  va_start(args, format);
-  print_time(stderr);
-  vfprintf(stderr, format, args);
-  va_end(args);
-
-  pthread_mutex_unlock(&mutex);
-}
-
-/**
- * print a formated string 
- */
-void info_msg(char *format, ...) {
-  
-  pthread_mutex_lock(&mutex);
-
-  va_list args;
-  va_start(args, format);
-  print_time();
-  vprintf(format, args);
-  va_end(args);
-
-  pthread_mutex_unlock(&mutex);
-
-}
-
-/**
- * prints an mpz value (debugging)
- */
-void print_mpz(const mpz_t mpz) {
-  
-  pthread_mutex_lock(&mutex);
-  mpz_out_str(stderr, 10, mpz);
-  pthread_mutex_unlock(&mutex);
-}

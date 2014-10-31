@@ -74,6 +74,11 @@ class Miner {
      */
     double gaps15_per_hour();
 
+    /**
+     * returns wether this is running
+     */
+    bool started();
+
   private:
 
     /* sieve size */

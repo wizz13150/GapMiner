@@ -76,6 +76,8 @@ class Opts {
     SingleOpt stats;
     SingleOpt threads;
     SingleOpt pull;
+    SingleOpt timeout;
+    SingleOpt stratum;
     SingleOpt sievesize;
     SingleOpt primes;
     SingleOpt shift;
@@ -119,6 +121,11 @@ class Opts {
                                                       
     bool has_pull()        { return pull.active;      }
     string get_pull()      { return pull.arg;         }
+                                                  
+    bool has_timeout()     { return timeout.active;   }
+    string get_timeout()   { return timeout.arg;      }
+                                                  
+    bool has_stratum()     { return stratum.active;   }
                                                   
     bool has_sievesize()   { return sievesize.active; }
     string get_sievesize() { return sievesize.arg;    }

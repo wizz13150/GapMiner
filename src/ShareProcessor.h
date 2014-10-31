@@ -31,6 +31,7 @@
 #include "PoWCore/src/PoWProcessor.h"
 #include "PoWCore/src/PoW.h"
 #include "BlockHeader.h"
+#include "NetProtocol.h"
 
 using namespace std;
 

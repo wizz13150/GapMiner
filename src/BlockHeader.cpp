@@ -141,6 +141,7 @@ BlockHeader *BlockHeader::clone() {
   header->difficulty = difficulty;
   header->nonce      = nonce;
   header->shift      = shift;
+  header->target     = target;
 
   memcpy(header->hash_prev_block, hash_prev_block, SHA256_DIGEST_LENGTH);
   memcpy(header->hash_merkle_root, hash_merkle_root, SHA256_DIGEST_LENGTH);
@@ -189,7 +190,7 @@ void BlockHeader::set_null() {
   difficulty = 0;
   nonce      = 0;
   shift      = 0;
-
+  target     = 0;
   adder.clear();
 }
 
@@ -281,6 +282,7 @@ string BlockHeader::to_s() {
   ss << "  difficulty:  " << difficulty << "\n";
   ss << "  nonce:       " << nonce << "\n";
   ss << "  shift:       " << shift << "\n";
+  ss << "  target:      " << target << "\n";
   ss << "  adder:       ";
 
   str.clear();
@@ -288,8 +290,9 @@ string BlockHeader::to_s() {
   if (have_little_endian())
     for (uint32_t i = header->adder.size(); i > 0; i--)
       ary_push_hex(str, header->adder, i - 1);
-
   ss << str << "\n";
+
+
   mpz_clear(mpz_hash);
   
   return ss.str();

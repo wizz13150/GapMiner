@@ -6,7 +6,7 @@ DBFLAGS   = -g -D DEBUG
 CXXFLAGS  = -Wall -Wextra -c -Winline -Wformat -Wformat-security \
             -pthread --param max-inline-insns-single=1000 -lm \
 						-Wno-write-strings
-LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson
+LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson -lboost_system
 OTFLAGS   = -march=native -O2 
 
 .PHONY: clean test all install
@@ -20,7 +20,7 @@ install: all
 
 
 # development
-#CFLAGS += $(DBFLAGS) 
+#CXXFLAGS += $(DBFLAGS) 
 
 # optimization
 CXXFLAGS  += $(OTFLAGS)

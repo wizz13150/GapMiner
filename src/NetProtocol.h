@@ -1,7 +1,7 @@
 /**
- * Header file of some thread safe verbose functions
+ * Template for a network protocol for GapMiner
  *
- * Copyright (C)  2014  The Gapcoin developers  <info@gapcoin.org>
+ * Copyright (C)  2014  Jonny Frey  <j0nn9.fr39@gmail.com>
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,16 +16,29 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __VERBOSE_H__
-#define __VERBOSE_H__
- 
+#ifndef __NETPROTOCOL_H__
+#define __NETPROTOCOL_H__
 #include <gmp.h>
-#include <inttypes.h>
-#include <string>
+#include "BlockHeader.h"
 
-extern pthread_mutex_t io_mutex;
 
-/* rerurn the current time */
-std::string get_time();
+class NetProtocol {
+  
+  public :
 
-#endif /* __VERBOSE_H__ */
+    NetProtocol() { }
+    virtual ~NetProtocol() { }
+ 
+    /**
+     * Request new Work from the Server
+     */
+    virtual BlockHeader *getwork() = 0;
+ 
+    /**
+     * send processed work to the Server
+     * returns true if share was accepted
+     */
+    virtual bool sendwork(BlockHeader *header) = 0;
+
+};
+#endif /* __NETPROTOCOL_H__*/

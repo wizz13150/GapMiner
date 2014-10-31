@@ -32,6 +32,8 @@
 #include "ShareProcessor.h"
 #include "Rpc.h"
 #include "verbose.h"
+#include "Opts.h"
+#include "Stratum.h"
 
 using namespace std;
 
@@ -160,7 +162,13 @@ void *ShareProcessor::share_processor(void *args) {
 
   queue<BlockHeader *> *shares = (queue<BlockHeader *> *) args;
   BlockHeader *cur;
-  Rpc *rpc = Rpc::get_instance();
+  NetProtocol *net = NULL;
+  bool stratum = Opts::get_instance()->has_stratum();
+
+  if (stratum)
+    net = (NetProtocol *) Stratum::get_instance();
+  else
+    net = (NetProtocol *) Rpc::get_instance();
 
   while (initialized) {
     
@@ -183,12 +191,20 @@ void *ShareProcessor::share_processor(void *args) {
     }
 
     /* submit share */
-    bool accepted = rpc->sendwork(cur);
+    bool accepted = net->sendwork(cur);
 
     /* send the share to gapcoind */
-    info_msg("Found Share: %0.10F  =>  %s\n", 
-             ((double) cur->get_pow().difficulty()) / TWO_POW48,
-             (accepted ? "accepted" : "stale!"));
+    if (!stratum) {
+      pthread_mutex_lock(&io_mutex);
+      cout.precision(7);
+      cout << get_time();
+      cout << "Found Share: ";
+      cout << fixed << (((double) cur->get_pow().difficulty()) 
+                                       / TWO_POW48);
+      cout << "  =>  " <<  (accepted ? "accepted" : "stale!");
+      cout << endl;
+      pthread_mutex_unlock(&io_mutex);
+    }
 
     delete cur;
   }

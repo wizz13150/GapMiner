@@ -26,6 +26,8 @@
 #include <jansson.h>
 #include "verbose.h"
 
+using namespace std;
+
 /* synchronization mutexes */
 pthread_mutex_t Rpc::send_mutex     = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t Rpc::creation_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -39,9 +41,6 @@ bool Rpc::initialized = false;
 
 /* indicates if curl was initialized */
 bool Rpc::curl_initialized = false;
-
-/* rpc timeout */
-int Rpc::timeout = 5;
 
 /* string stream for receiving */
 stringstream *Rpc::recv_ss = new stringstream;
@@ -92,7 +91,7 @@ size_t curl_write(char *ptr, size_t size, size_t nmemb, void *user_data) {
  * initialize curl with the given 
  * username, password, url and port
  */
-bool Rpc::init_curl(string userpass, string url) {
+bool Rpc::init_curl(string userpass, string url, int timeout) {
 
   curl_global_init(CURL_GLOBAL_ALL);
 
@@ -168,47 +167,71 @@ BlockHeader *Rpc::getwork() {
 
   /* Check for errors */ 
   if(res != CURLE_OK) {
-    error_msg("curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(res));
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "curl_easy_perform() failed: "; 
+    cout << curl_easy_strerror(res) << endl;
+    pthread_mutex_unlock(&io_mutex);
     return NULL;
   }
 
 
   /* parse response */
-  json_t *root;
+  json_t *root, *tdiff;
   json_error_t error;
 
   root = json_loads(recv_ss->str().c_str(), 0, &error);
   recv_ss->str("");
 
   if(!root) {
-    error_msg("jansson error: on line %d: %s\n", error.line, error.text);
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "jansson error: on line " << error.line;
+    cout << ": " << error.text << endl;
+    pthread_mutex_unlock(&io_mutex);
     return NULL;
   }
 
   if (!json_is_object(root)) {
-    error_msg("can not parse gapcoind response\n");
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "can not parse gapcoind response" << endl;
+    pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
   }
   root = json_object_get(root, "result");
 
   if (!json_is_object(root)) {
-    error_msg("can not parse gapcoind response\n");
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "can not parse gapcoind response" << endl;
+    pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
   }
-  root = json_object_get(root, "data");
+  tdiff = json_object_get(root, "difficulty");
+  if (!json_is_integer(tdiff)) {
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "can not parse gapcoind difficulty" << endl;
+    pthread_mutex_unlock(&io_mutex);
+    json_decref(tdiff);
+    return NULL;
+  }
 
+  uint64_t nDiff = json_number_value(tdiff);
+  json_decref(tdiff);
+
+  root = json_object_get(root, "data");
   if (!json_is_string(root)) {
-    error_msg("can not parse gapcoind response\n");
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "can not parse gapcoind response" << endl;
+    pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
   }
   string data = json_string_value(root);
   json_decref(root);
-  
-  return new BlockHeader(&data);
+
+  BlockHeader *head = new BlockHeader(&data);
+  head->target = nDiff;
+  return head;
 }
 
 /**
@@ -250,8 +273,10 @@ bool Rpc::sendwork(BlockHeader *header) {
 
   /* Check for errors */ 
   if(res != CURLE_OK) {
-    error_msg("curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(res));
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "curl_easy_perform() failed: ";
+    cout << curl_easy_strerror(res) << endl;
+    pthread_mutex_unlock(&io_mutex);
     return false;
   }
 
@@ -264,19 +289,26 @@ bool Rpc::sendwork(BlockHeader *header) {
   recv_ss->str("");
 
   if(!root) {
-    error_msg("jansson error: on line %d: %s\n", error.line, error.text);
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "jansson error: on line " << error.line;
+    cout << ": " << error.text << endl;
+    pthread_mutex_unlock(&io_mutex);
     return NULL;
   }
 
   if (!json_is_object(root)) {
-    error_msg("can not parse gapcoind response\n");
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "can not parse gapcoind response" << endl;
+    pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
   }
   root = json_object_get(root, "result");
 
   if (!json_is_boolean(root)) {
-    error_msg("can not parse gapcoind response\n");
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "can not parse gapcoind response" << endl;
+    pthread_mutex_unlock(&io_mutex);
     json_decref(root);
     return NULL;
   }

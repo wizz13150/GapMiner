@@ -48,6 +48,9 @@ class BlockHeader {
     /* the current block difficulty */
     uint64_t difficulty;
 
+    /* the target for pool mining */
+    uint64_t target;
+
     /* the block nonce (value to change the block hash) */
     uint32_t nonce;
 

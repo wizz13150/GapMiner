@@ -124,6 +124,8 @@ quiet(    "-q", "--quiet",          "be quiet (only prints shares)",            
 stats(    "-i", "--stats-interval", "interval (sec) to print mining informations", true),
 threads(  "-t", "--threads",        "number of mining threads",                    true),
 pull(     "-l", "--pull-interval",  "seconds to wait between getwork request",     true),
+timeout(  "-m", "--timeout",        "seconds to wait for server to respond",       true),
+stratum(  "-r", "--stratum",        "use stratum protocol for connection",         false),
 sievesize("-s", "--sieve-size",     "the prime sieve size",                        true),
 primes(   "-r", "--sieve-primes",   "number of primes for sieving",                true),
 shift(    "-f", "--shift",          "the adder shift",                             true),
@@ -160,6 +162,12 @@ license(  "-v", "--license",        "show license of this program",             
   pull.active = has_arg(pull.short_opt,  pull.long_opt);
   if (pull.active)
     pull.arg = get_arg(pull.short_opt,  pull.long_opt);
+                                          
+  timeout.active = has_arg(timeout.short_opt,  timeout.long_opt);
+  if (timeout.active)
+    timeout.arg = get_arg(timeout.short_opt,  timeout.long_opt);
+
+  stratum.active = has_arg(stratum.short_opt,  stratum.long_opt);
                                           
   sievesize.active = has_arg(sievesize.short_opt,  sievesize.long_opt);
   if (sievesize.active)
@@ -225,6 +233,12 @@ string Opts::get_help()  {
 
   ss << "  " << pull.short_opt  << "  " << left << setw(18);
   ss << pull.long_opt << "  " << pull.description << "\n\n";
+
+  ss << "  " << timeout.short_opt  << "  " << left << setw(18);
+  ss << timeout.long_opt << "  " << timeout.description << "\n\n";
+
+  ss << "  " << stratum.short_opt  << "  " << left << setw(18);
+  ss << stratum.long_opt << "  " << stratum.description << "\n\n";
 
   ss << "  " << sievesize.short_opt  << "  " << left << setw(18);
   ss << sievesize.long_opt << "  " << sievesize.description << "\n\n";

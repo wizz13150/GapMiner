@@ -166,10 +166,12 @@ Miner::ThreadArgs::ThreadArgs(int id,
 /* a single mining thread */
 void *Miner::miner(void *args) {
 
+#ifndef WINDOWS
   /* use idle CPU cycles for mining */
   struct sched_param param;
   param.sched_priority = sched_get_priority_min(SCHED_IDLE);
   sched_setscheduler(0, SCHED_IDLE, &param);
+#endif
 
   
   ThreadArgs *targs = (ThreadArgs *) args;
@@ -201,7 +203,7 @@ void *Miner::miner(void *args) {
     PoW pow(mpz_hash, 
             targs->header->shift, 
             NULL, 
-            targs->header->difficulty, 
+            targs->header->target, 
             targs->header->nonce);
 
     sieve.run_sieve(&pow, NULL);
@@ -302,3 +304,8 @@ double Miner::gaps15_per_hour() {
 
   return g15;
 }
+
+/**
+ * returns wether this is running
+ */
+bool Miner::started() { return running; }
