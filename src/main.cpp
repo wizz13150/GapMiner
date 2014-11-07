@@ -136,8 +136,10 @@ void *getwork_thread(void *arg) {
   uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 20);
   header->shift  = shift;
 
+#ifndef CPU_ONLY
   if (opts->has_use_gpu())
     shift = 64;
+#endif    
   
 
   /* start mining */
@@ -217,11 +219,13 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+#ifndef CPU_ONLY
   if (opts->has_benchmark()) {
     GPUFermat *fermat = GPUFermat::get_instance();
     fermat->benchmark();
     exit(EXIT_SUCCESS);
   }
+#endif
 
   if (opts->has_help()  ||
       !opts->has_host() ||
@@ -242,7 +246,7 @@ int main(int argc, char *argv[]) {
   int n_threads = (opts->has_threads() ? atoi(opts->get_threads().c_str()) : 1);
 
   /* default 5 sec timeout */
-  int timeout = (opts->has_threads() ? atoi(opts->get_timeout().c_str()) : 5);
+  int timeout = (opts->has_timeout() ? atoi(opts->get_timeout().c_str()) : 5);
 
   /* default shift 20 */
   uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 20);
@@ -272,6 +276,7 @@ int main(int argc, char *argv[]) {
                          atoll(opts->get_primes().c_str()) :
                          500000);
 
+#ifndef CPU_ONLY
   if (opts->has_use_gpu()) {
 
     sieve_size = (opts->has_sievesize() ? 
@@ -283,7 +288,13 @@ int main(int argc, char *argv[]) {
                  1500000);
 
     shift = 64;
+
+    unsigned dev_id = (opts->has_gpu_dev() ? atoi(opts->get_gpu_dev().c_str()) : 0);
+    string platfrom  = (opts->has_platform() ? string(opts->get_platform()) : "amd");
+
+    GPUFermat::get_instance(dev_id, platfrom.c_str());
   }
+#endif
  
 
   miner = new Miner(sieve_size, primes, n_threads);

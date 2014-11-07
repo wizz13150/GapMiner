@@ -295,6 +295,11 @@ void *Stratum::recv_thread(void *arg) {
       } else if (json_is_object(result)) {
         parse_block_work(miner, result);
 
+      } else if (json_is_null(result)) {
+        pthread_mutex_lock(&io_mutex);
+        cout << get_time() << "Found share stale!" << endl;
+        pthread_mutex_unlock(&io_mutex);
+
       } else {
         pthread_mutex_lock(&io_mutex);
         cout << get_time() << "can not parse server response" << endl;
@@ -391,6 +396,7 @@ void Stratum::parse_block_work(Miner *miner, json_t *result) {
   pthread_mutex_lock(&io_mutex);
   cout.precision(7);
   cout << get_time() << "Got new target: ";
+  cout << fixed << (((double) head.target) / TWO_POW48) << " @ ";
   cout << fixed << (((double) head.difficulty) / TWO_POW48) << endl;
   pthread_mutex_unlock(&io_mutex);
 }
@@ -408,12 +414,9 @@ bool Stratum::sendwork(BlockHeader *header) {
 
   stringstream ss;
   ss << "{\"id\": " << n_msgs;
-  ss << ", \"method\": \"blockchain.block.submit\", \"params\": ";
-  ss << "{ \"user\": \"" << *user;
-
-  /* not optimal password should be hashed */
-  ss << "\", \"password\": \"" << *password  << "\", ";
-  ss << "\"data\": \"" << header->get_hex() << "\" } }\n";
+  ss << ", \"method\": \"mining.submit\", \"params\": ";
+  ss << "[ \"" << *user << "\", \"" << *password;
+  ss << "\", \"" << header->get_hex()  << "\" ] }\n";
 
   bool error;
   do {
@@ -460,11 +463,9 @@ BlockHeader *Stratum::getwork() {
   
   stringstream ss;
   ss << "{\"id\": " << n_msgs;
-  ss << ", \"method\": \"blockchain.block.request\", \"params\": ";
-  ss << "{ \"user\": \"" << *user;
-
+  ss << ", \"method\": \"mining.request\", \"params\": ";
   /* not optimal password should be hashed */
-  ss << "\", \"password\": \"" << *password  << "\" } }\n";
+  ss << "[ \"" << *user << "\", \"" << *password  << "\" ] }\n";
 
   bool error;
   do {

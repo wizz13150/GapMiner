@@ -121,21 +121,24 @@ port(      "-p", "--port",           "port to connect to",                      
 user(      "-u", "--user",           "user for gapcoin rpc authentification",         true),
 pass(      "-x", "--pwd",            "password for gapcoin rpc authentification",     true),
 quiet(     "-q", "--quiet",          "be quiet (only prints shares)",                 false),
+extra_vb(  "-e", "--extra-verbose",  "additional verbose output",                     false),
 stats(     "-i", "--stats-interval", "interval (sec) to print mining informations",   true),
 threads(   "-t", "--threads",        "number of mining threads",                      true),
 pull(      "-l", "--pull-interval",  "seconds to wait between getwork request",       true),
 timeout(   "-m", "--timeout",        "seconds to wait for server to respond",         true),
-stratum(   "-r", "--stratum",        "use stratum protocol for connection",           false),
+stratum(   "-c", "--stratum",        "use stratum protocol for connection",           false),
 sievesize( "-s", "--sieve-size",     "the prime sieve size",                          true),
 primes(    "-i", "--sieve-primes",   "number of primes for sieving",                  true),
 shift(     "-f", "--shift",          "the adder shift",                               true),
+#ifndef CPU_ONLY
 benchmark( "-b", "--benchmark",      "run a gpu benchmark",                           false),
 use_gpu(   "-g", "--use-gpu",        "use the gpu for Fermat testing",                false),
 gpu_dev(   "-d", "--gpu-dev",        "the gpu device id",                             true),
-extra_vb(  "-e", "--extra-verbose",  "additional verbose output",                     false),
 work_items("-w", "--work-items",     "gpu work items (default 2048)",                 true),
 max_primes("-a", "--max-primes",     "maximum sieve primes (for use with gpu)",       true),
 queue_size("-z", "--queue-size",     "the gpu waiting queue size (memory intensive)", true),
+platform(  "-a", "--platform",       "opencl platform (amd or nvidia)",               true),
+#endif
 help(      "-h", "--help",           "print this information",                        false),
 license(   "-v", "--license",        "show license of this program",                  false) {
        
@@ -157,6 +160,7 @@ license(   "-v", "--license",        "show license of this program",            
     pass.arg = get_arg(pass.short_opt,  pass.long_opt);
 
   quiet.active = has_arg(quiet.short_opt, quiet.long_opt);
+  extra_vb.active = has_arg(extra_vb.short_opt,  extra_vb.long_opt);
 
   stats.active = has_arg(stats.short_opt, stats.long_opt);
   if (stats.active)
@@ -188,6 +192,8 @@ license(   "-v", "--license",        "show license of this program",            
   if (shift.active)
     shift.arg = get_arg(shift.short_opt,  shift.long_opt);
 
+
+#ifndef CPU_ONLY
   benchmark.active = has_arg(benchmark.short_opt,  benchmark.long_opt);
                                           
   use_gpu.active = has_arg(use_gpu.short_opt,  use_gpu.long_opt);
@@ -195,8 +201,6 @@ license(   "-v", "--license",        "show license of this program",            
   gpu_dev.active = has_arg(gpu_dev.short_opt,  gpu_dev.long_opt);
   if (gpu_dev.active)
     gpu_dev.arg = get_arg(gpu_dev.short_opt,  gpu_dev.long_opt);
-                                          
-  extra_vb.active = has_arg(extra_vb.short_opt,  extra_vb.long_opt);
                                           
   work_items.active = has_arg(work_items.short_opt,  work_items.long_opt);
   if (work_items.active)
@@ -209,6 +213,11 @@ license(   "-v", "--license",        "show license of this program",            
   queue_size.active = has_arg(queue_size.short_opt,  queue_size.long_opt);
   if (queue_size.active)
     queue_size.arg = get_arg(queue_size.short_opt,  queue_size.long_opt);
+
+  platform.active = has_arg(platform.short_opt,  platform.long_opt);
+  if (platform.active)
+    platform.arg = get_arg(platform.short_opt,  platform.long_opt);
+#endif    
                                           
   help.active = has_arg(help.short_opt,  help.long_opt);
   license.active = has_arg(license.short_opt,  license.long_opt);
@@ -254,6 +263,9 @@ string Opts::get_help()  {
   ss << "  " << quiet.short_opt << "  " << left << setw(18);
   ss << quiet.long_opt << "  " << quiet.description << "\n\n";
 
+  ss << "  " << extra_vb.short_opt  << "  " << left << setw(18);
+  ss << extra_vb.long_opt << "  " << extra_vb.description << "\n\n";
+
   ss << "  " << stats.short_opt << "  " << left << setw(18);
   ss << stats.long_opt << "  " << stats.description << "\n\n";
 
@@ -278,6 +290,7 @@ string Opts::get_help()  {
   ss << "  " << shift.short_opt  << "  " << left << setw(18);
   ss << shift.long_opt << "  " << shift.description << "\n\n";
 
+#ifndef CPU_ONLY
   ss << "  " << benchmark.short_opt  << "  " << left << setw(18);
   ss << benchmark.long_opt << "  " << benchmark.description << "\n\n";
 
@@ -287,9 +300,6 @@ string Opts::get_help()  {
   ss << "  " << gpu_dev.short_opt  << "  " << left << setw(18);
   ss << gpu_dev.long_opt << "  " << gpu_dev.description << "\n\n";
 
-  ss << "  " << extra_vb.short_opt  << "  " << left << setw(18);
-  ss << extra_vb.long_opt << "  " << extra_vb.description << "\n\n";
-
   ss << "  " << work_items.short_opt  << "  " << left << setw(18);
   ss << work_items.long_opt << "  " << work_items.description << "\n\n";
 
@@ -298,6 +308,10 @@ string Opts::get_help()  {
 
   ss << "  " << queue_size.short_opt  << "  " << left << setw(18);
   ss << queue_size.long_opt << "  " << queue_size.description << "\n\n";
+
+  ss << "  " << platform.short_opt  << "  " << left << setw(18);
+  ss << platform.long_opt << "  " << platform.description << "\n\n";
+#endif  
 
   ss << "  " << help.short_opt << "  " << left << setw(18);
   ss << help.long_opt << "  " << help.description << "\n\n";

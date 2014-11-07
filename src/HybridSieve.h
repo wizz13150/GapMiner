@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef CPU_ONLY
 #ifndef __HYBRID_SIEVE_H__
 #define __HYBRID_SIEVE_H__
 #include <inttypes.h>
@@ -201,3 +202,4 @@ class HybridSieve : public Sieve {
 
 };
 #endif /* __HYBRID_SIEVE_H__ */
+#endif /* CPU_ONLY */

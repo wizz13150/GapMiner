@@ -73,6 +73,7 @@ class Opts {
     SingleOpt user;
     SingleOpt pass;
     SingleOpt quiet;
+    SingleOpt extra_vb;
     SingleOpt stats;
     SingleOpt threads;
     SingleOpt pull;
@@ -81,13 +82,15 @@ class Opts {
     SingleOpt sievesize;
     SingleOpt primes;
     SingleOpt shift;
+#ifndef CPU_ONLY
     SingleOpt benchmark;
     SingleOpt use_gpu;
     SingleOpt gpu_dev;
-    SingleOpt extra_vb;
     SingleOpt work_items;
     SingleOpt max_primes;
     SingleOpt queue_size;
+    SingleOpt platform;
+#endif    
     SingleOpt help;
     SingleOpt license;
 
@@ -119,6 +122,8 @@ class Opts {
     string get_pass()       { return pass.arg;          }
                                                         
     bool has_quiet()        { return quiet.active;      }
+                                                   
+    bool has_extra_vb()     { return extra_vb.active;   }
                                                         
     bool has_stats()        { return stats.active;      }
     string get_stats()      { return stats.arg;         }
@@ -143,14 +148,13 @@ class Opts {
     bool has_shift()        { return shift.active;      }
     string get_shift()      { return shift.arg;         }
                                                         
+#ifndef CPU_ONLY                                                        
     bool has_benchmark()    { return benchmark.active;  }
                                                         
     bool has_use_gpu()      { return use_gpu.active;    }
                                                         
     bool has_gpu_dev()      { return gpu_dev.active;    }
     string get_gpu_dev()    { return gpu_dev.arg;       }
-                                                   
-    bool has_extra_vb()     { return extra_vb.active;   }
                                                    
     bool has_work_items()   { return work_items.active; }
     string get_work_items() { return work_items.arg;    }
@@ -160,6 +164,10 @@ class Opts {
                                                   
     bool has_queue_size()   { return queue_size.active; }
     string get_queue_size() { return queue_size.arg;    }
+                                                  
+    bool has_platform()     { return platform.active;   }
+    string get_platform()   { return platform.arg;      }
+#endif    
                                                   
     bool has_help()         { return help.active;       }
                                                         

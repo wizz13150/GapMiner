@@ -1,3 +1,4 @@
+#ifndef CPU_ONLY
 #ifndef __GPU_FERMAT_H__
 #define __GPU_FERMAT_H__
 #include <CL/cl.hpp>
@@ -96,11 +97,12 @@ class GPUFermat {
     cl_command_queue queue;
 
     /* this is a singleton */
-    GPUFermat();
+    GPUFermat(unsigned device_id, const char *platformId);
 
 
     /* initialize opencl for the given device */
-    bool init_cl(unsigned device_id = 0);
+    bool init_cl(unsigned device_id = 0, 
+                 const char *platformId = "amd");
 
 
     void benchmark2();
@@ -124,7 +126,8 @@ class GPUFermat {
   public :
 
     /* return the only instance of this */
-    static GPUFermat *get_instance();
+    static GPUFermat *get_instance(unsigned device_id = (unsigned)(-1), 
+                                   const char *platformId = NULL);
 
     /* public interface to the gpu Fermat test */
     void fermat_gpu(uint32_t *candidates, bool *results);
@@ -136,3 +139,4 @@ class GPUFermat {
     void test_gpu();
 };
 #endif /* __GPU_FERMAT_H__ */
+#endif /* CPU_ONLY */

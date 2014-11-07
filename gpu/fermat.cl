@@ -897,7 +897,7 @@ void FermatTest352(uint4 *restrict limbs,
   uint32_t inverted = invert_limb(limbs[0].x);  
   
 //   uint4 q0 = 0, q1 = 0;  
-  uint4 q[2] = {0, 0};
+  uint4 q[2] = {{0,0,0,0},{0,0,0,0}};
   {
     uint4 dl4 = {0, 0, 0, 0};    
     uint4 dl3 = {0, 0, 0, 1};
@@ -984,7 +984,7 @@ void FermatTest320(uint4 *restrict limbs, uint4 *redcl)
   uint32_t inverted = invert_limb(limbs[0].x);  
   
 //   uint4 q0 = 0, q1 = 0;  
-  uint4 q[2] = {0, 0};
+  uint4 q[2] = {{0,0,0,0},{0,0,0,0}};
   {
     uint4 dl4 = {0, 0, 0, 0};    
     uint4 dl3 = {0, 0, 0, 0};

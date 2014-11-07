@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef CPU_ONLY
 #ifndef __STDC_FORMAT_MACROS 
 #define __STDC_FORMAT_MACROS 
 #endif
@@ -530,3 +531,4 @@ bool HybridSieve::should_stop(uint8_t hash[SHA256_DIGEST_LENGTH]) {
   if (result) stop();
   return result;
 }
+#endif /* CPU_ONLY */

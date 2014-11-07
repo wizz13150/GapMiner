@@ -27,6 +27,10 @@ install: all
 #CXXFLAGS  += $(OTFLAGS)
 #LDFLAGS   += $(OTFLAGS)
 
+# disable GPU support
+CXXFLAGS += -DCPU_ONLY
+LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson -lboost_system \
+
 ALL_SRC = $(shell find $(SRC) -type f -name '*.cpp')
 ALL_OBJ = $(ALL_SRC:%.cpp=%.o)
 

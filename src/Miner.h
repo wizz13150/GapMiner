@@ -20,6 +20,7 @@
 #define __MINER_H__
 #include <pthread.h>
 #include "BlockHeader.h"
+#include "PoWCore/src/Sieve.h"
 #include "HybridSieve.h"
 
 
@@ -96,8 +97,10 @@ class Miner {
     /* indicates if this is started */
     bool is_started;
 
+#ifndef CPU_ONLY
     /* indicates if we should use gpu or not */
     bool use_gpu;
+#endif    
 
     /* synchronization mutex */
     static pthread_mutex_t mutex;       
@@ -122,8 +125,10 @@ class Miner {
         /* the Block header to mine for */
         BlockHeader *header;
 
+#ifndef CPU_ONLY
         /* the HybridSieve for this */
         HybridSieve *hsieve;
+#endif        
 
         /* the Sieve for this */
         Sieve *sieve;

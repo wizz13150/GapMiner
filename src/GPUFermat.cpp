@@ -1,3 +1,4 @@
+#ifndef CPU_ONLY
 #include <CL/cl.hpp>
 #include <iostream>
 #include <fstream>
@@ -62,11 +63,12 @@ unsigned GPUFermat::workItems = 2048;
 unsigned GPUFermat::operandSize = 320/32;
 
 /* return the only instance of this */
-GPUFermat *GPUFermat::get_instance() {
+GPUFermat *GPUFermat::get_instance(unsigned device_id, 
+                                   const char *platformId) {
 
   pthread_mutex_lock(&creation_mutex);
-  if (!initialized) {
-    only_instance = new GPUFermat();
+  if (!initialized && device_id != (unsigned)(-1) && platformId != NULL) {
+    only_instance = new GPUFermat(device_id, platformId);
     initialized   = true;
   }
   pthread_mutex_unlock(&creation_mutex);
@@ -75,8 +77,8 @@ GPUFermat *GPUFermat::get_instance() {
 }
 
 /* initialize this */
-GPUFermat::GPUFermat() {
-  init_cl();
+GPUFermat::GPUFermat(unsigned device_id, const char *platformId) {
+  init_cl(device_id, platformId);
 
   elementsNum = GroupSize * workItems;
   numberLimbsNum = elementsNum * operandSize;
@@ -90,14 +92,21 @@ GPUFermat::GPUFermat() {
 
 }
 
-bool GPUFermat::init_cl(unsigned device_id) {
-  const char *platformId = "amd";
+bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
+
   const char *platformName = "";
 
   if (strcmp(platformId, "amd") == 0)
     platformName = "AMD Accelerated Parallel Processing";
   else if (strcmp(platformId, "nvidia") == 0)
     platformName = "NVIDIA CUDA";
+  else {
+    pthread_mutex_lock(&io_mutex);                            
+    cout << get_time() << "ERROR: platform " << platformId << " not supported ";
+    cout << " use amd or nvidia" << endl;
+    pthread_mutex_unlock(&io_mutex);                       
+    exit(EXIT_FAILURE);
+  }
   
   cl_platform_id platforms[10];
   cl_uint numplatforms;
@@ -606,3 +615,4 @@ void GPUFermat::fermatTestBenchmark(cl_command_queue queue,
   std::cout << "  CPU with 320 bits: " << cpuTime << "ms (" << opsNum << "fM ops/sec)" << std::endl;
   std::cout << "  GPU is " <<  ((double) cpuTime) / ((double) gpuTime) << "times faster" << std::endl;
 }
+#endif /* CPU_ONLY */

@@ -33,8 +33,8 @@
 #include "ShareProcessor.h"
 #include "PoWCore/src/Sieve.h"
 #include "Opts.h"
-#include "HybridSieve.h"
 #include "verbose.h"
+#include "HybridSieve.h"
 
 /* synchronization mutex */
 pthread_mutex_t Miner::mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -49,25 +49,31 @@ Miner::Miner(uint64_t sieve_size,
   this->n_threads    = n_threads;
   this->running      = false;
   this->is_started   = false;
+#ifndef CPU_ONLY  
   this->use_gpu      = Opts::get_instance()->has_use_gpu(); 
+#endif  
 
   threads      = (pthread_t *)   calloc(n_threads, sizeof(pthread_t));
   args         = (ThreadArgs **) calloc(n_threads, sizeof(ThreadArgs *));
 
+#ifndef CPU_ONLY  
   if (use_gpu)
     this->n_threads = 1;
+#endif    
 }              
 
 /* start processing */
 void Miner::start(BlockHeader *header) {
 
   running = true;
+#ifndef CPU_ONLY
   Opts *opts = Opts::get_instance();
   bool use_gpu = opts->has_use_gpu(); 
 
   uint64_t max_primes = (opts->has_max_primes() ? atoi(opts->get_max_primes().c_str()) : 30000000);
   uint64_t work_items = (opts->has_work_items() ? atoi(opts->get_work_items().c_str()) : 2048);
   uint64_t queue_size = (opts->has_queue_size() ? atoi(opts->get_queue_size().c_str()) : 10);
+#endif
 
   ShareProcessor *share_processor = ShareProcessor::get_processor();
   share_processor->update_header(header);
@@ -79,6 +85,7 @@ void Miner::start(BlockHeader *header) {
                              &running, 
                              header);
     
+#ifndef CPU_ONLY
     if (use_gpu) {
       args[i]->hsieve = new HybridSieve((PoWProcessor *) share_processor, 
                                         sieve_primes, 
@@ -92,10 +99,13 @@ void Miner::start(BlockHeader *header) {
              SHA256_DIGEST_LENGTH);
              
     } else {
+#endif
       args[i]->sieve = new Sieve((PoWProcessor *) share_processor, 
                                  sieve_primes, 
                                  sieve_size);
+#ifndef CPU_ONLY
     }
+#endif
     
     pthread_create(&threads[i], NULL, miner, (void *) args[i]);
 
@@ -117,22 +127,28 @@ Miner::~Miner() {
 /* stops all threads and waits until they are finished */
 void Miner::stop() {
 
+#ifndef CPU_ONLY
   bool use_gpu = Opts::get_instance()->has_use_gpu(); 
+#endif
 
   if (running) {
     running = false;
     
     for (int i = 0; i < n_threads; i++) {
 
+#ifndef CPU_ONLY
       if (use_gpu)
         args[i]->hsieve->stop();
+#endif
 
       pthread_join(threads[i], NULL);
       delete args[i]->header;
 
+#ifndef CPU_ONLY
       if (use_gpu)
         delete args[i]->hsieve;
       else
+#endif
         delete args[i]->sieve;
     }
   }
@@ -143,11 +159,14 @@ bool Miner::update_header(BlockHeader *header) {
   
   if (!is_started) return false;
 
+#ifndef CPU_ONLY
   bool use_gpu = Opts::get_instance()->has_use_gpu(); 
+#endif
   
   if (!running)
     return false;
 
+#ifndef CPU_ONLY
   /* restart sieve  with new header */
   for (int i = 0; use_gpu && i < n_threads; i++) {
       memcpy(args[i]->hsieve->hash_prev_block, 
@@ -156,6 +175,7 @@ bool Miner::update_header(BlockHeader *header) {
 
       args[i]->hsieve->stop();
   }
+#endif
 
   pthread_mutex_lock(&mutex);
   for (int i = 0; i < n_threads; i++) {
@@ -198,19 +218,25 @@ void *Miner::miner(void *args) {
 
   
   ThreadArgs *targs = (ThreadArgs *) args;
+#ifndef CPU_ONLY
   bool use_gpu = Opts::get_instance()->has_use_gpu(); 
+#endif
 
   mpz_t mpz_hash;
   mpz_init(mpz_hash);
+#ifndef CPU_ONLY
   uint8_t hash_prev_block[SHA256_DIGEST_LENGTH];
+#endif
 
   while (*targs->running) {
     
     pthread_mutex_lock(&mutex);
     targs->header->get_hash(mpz_hash);
+#ifndef CPU_ONLY
     memcpy(hash_prev_block,
            targs->header->hash_prev_block,
            SHA256_DIGEST_LENGTH);
+#endif           
     
     /* hash has to be in range (2^255, 2^256) */
     while (mpz_sizeinbase(mpz_hash, 2) != 256) {
@@ -227,9 +253,11 @@ void *Miner::miner(void *args) {
             targs->header->target, 
             targs->header->nonce);
 
+#ifndef CPU_ONLY
     if (use_gpu)
       targs->hsieve->run_sieve(&pow, NULL, hash_prev_block);
     else
+#endif
       targs->sieve->run_sieve(&pow, NULL);
 
     pthread_mutex_lock(&mutex);
@@ -239,9 +267,11 @@ void *Miner::miner(void *args) {
   
   mpz_clear(mpz_hash);
 
+#ifndef CPU_ONLY
   if (use_gpu)
     delete targs->hsieve;
   else
+#endif
     delete targs->sieve;
 
   return NULL;
@@ -256,9 +286,11 @@ double Miner::avg_primes_per_sec() {
   
   double apps = 0;
   for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
     if (use_gpu)
       apps += args[i]->hsieve->avg_primes_per_sec();
     else
+#endif
       apps += args[i]->sieve->avg_primes_per_sec();
 
   return apps;
@@ -274,9 +306,11 @@ double Miner::avg_gaps10_per_hour() {
   
   double ag10 = 0;
   for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
     if (use_gpu)
       ag10 += args[i]->hsieve->avg_gaps10_per_hour();
     else
+#endif    
       ag10 += args[i]->sieve->avg_gaps10_per_hour();
 
   return ag10;
@@ -291,9 +325,11 @@ double Miner::avg_gaps15_per_hour() {
   
   double ag15 = 0;
   for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
     if (use_gpu)
       ag15 += args[i]->hsieve->avg_gaps15_per_hour();
     else
+#endif
       ag15 += args[i]->sieve->avg_gaps15_per_hour();
 
   return ag15;
@@ -308,9 +344,11 @@ double Miner::primes_per_sec() {
   
   double pps = 0;
   for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
     if (use_gpu)
       pps += args[i]->hsieve->primes_per_sec();
     else
+#endif    
       pps += args[i]->sieve->primes_per_sec();
 
   return pps;
@@ -326,9 +364,11 @@ double Miner::gaps10_per_hour() {
   
   double g10 = 0;
   for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
     if (use_gpu)
       g10 += args[i]->hsieve->gaps10_per_hour();
     else
+#endif    
       g10 += args[i]->sieve->gaps10_per_hour();
 
   return g10;
@@ -343,9 +383,11 @@ double Miner::gaps15_per_hour() {
   
   double g15 = 0;
   for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
     if (use_gpu)
       g15 += args[i]->hsieve->gaps15_per_hour();
     else
+#endif    
       g15 += args[i]->sieve->gaps15_per_hour();
 
   return g15;

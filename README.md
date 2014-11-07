@@ -1,4 +1,4 @@
-# GapMiner - A standalone Gapcoin (GAP) CPU rpc, pool miner
+# GapMiner - A standalone Gapcoin (GAP) CPU, GPU, rpc, pool miner
 ---
 <br/>
 ## So what's the purpose of a standalone rpc miner? 
