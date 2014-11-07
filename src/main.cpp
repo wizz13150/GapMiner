@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
   int n_threads = (opts->has_threads() ? atoi(opts->get_threads().c_str()) : 1);
 
   /* default 5 sec timeout */
-  int timeout = (opts->has_threads() ? atoi(opts->get_timeout().c_str()) : 5);
+  int timeout = (opts->has_timeout() ? atoi(opts->get_timeout().c_str()) : 5);
 
   /* default shift 20 */
   uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 20);
