@@ -116,21 +116,28 @@ pthread_mutex_t Opts::creation_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* initializes all possible args */
 Opts::Opts(int argc, char *argv[]) :
-host(     "-o", "--host",           "host ip address",                             true),
-port(     "-p", "--port",           "port to connect to",                          true),
-user(     "-u", "--user",           "user for gapcoin rpc authentification",       true),
-pass(     "-x", "--pwd",            "password for gapcoin rpc authentification",   true),
-quiet(    "-q", "--quiet",          "be quiet (only prints shares)",               false),
-stats(    "-i", "--stats-interval", "interval (sec) to print mining informations", true),
-threads(  "-t", "--threads",        "number of mining threads",                    true),
-pull(     "-l", "--pull-interval",  "seconds to wait between getwork request",     true),
-timeout(  "-m", "--timeout",        "seconds to wait for server to respond",       true),
-stratum(  "-r", "--stratum",        "use stratum protocol for connection",         false),
-sievesize("-s", "--sieve-size",     "the prime sieve size",                        true),
-primes(   "-r", "--sieve-primes",   "number of primes for sieving",                true),
-shift(    "-f", "--shift",          "the adder shift",                             true),
-help(     "-h", "--help",           "print this information",                      false),
-license(  "-v", "--license",        "show license of this program",                false) {
+host(      "-o", "--host",           "host ip address",                               true),
+port(      "-p", "--port",           "port to connect to",                            true),
+user(      "-u", "--user",           "user for gapcoin rpc authentification",         true),
+pass(      "-x", "--pwd",            "password for gapcoin rpc authentification",     true),
+quiet(     "-q", "--quiet",          "be quiet (only prints shares)",                 false),
+stats(     "-i", "--stats-interval", "interval (sec) to print mining informations",   true),
+threads(   "-t", "--threads",        "number of mining threads",                      true),
+pull(      "-l", "--pull-interval",  "seconds to wait between getwork request",       true),
+timeout(   "-m", "--timeout",        "seconds to wait for server to respond",         true),
+stratum(   "-r", "--stratum",        "use stratum protocol for connection",           false),
+sievesize( "-s", "--sieve-size",     "the prime sieve size",                          true),
+primes(    "-i", "--sieve-primes",   "number of primes for sieving",                  true),
+shift(     "-f", "--shift",          "the adder shift",                               true),
+benchmark( "-b", "--benchmark",      "run a gpu benchmark",                           false),
+use_gpu(   "-g", "--use-gpu",        "use the gpu for Fermat testing",                false),
+gpu_dev(   "-d", "--gpu-dev",        "the gpu device id",                             true),
+extra_vb(  "-e", "--extra-verbose",  "additional verbose output",                     false),
+work_items("-w", "--work-items",     "gpu work items (default 2048)",                 true),
+max_primes("-a", "--max-primes",     "maximum sieve primes (for use with gpu)",       true),
+queue_size("-z", "--queue-size",     "the gpu waiting queue size (memory intensive)", true),
+help(      "-h", "--help",           "print this information",                        false),
+license(   "-v", "--license",        "show license of this program",                  false) {
        
   /* get command line opts */
   host.active = has_arg(host.short_opt,  host.long_opt);
@@ -180,6 +187,28 @@ license(  "-v", "--license",        "show license of this program",             
   shift.active = has_arg(shift.short_opt,  shift.long_opt);
   if (shift.active)
     shift.arg = get_arg(shift.short_opt,  shift.long_opt);
+
+  benchmark.active = has_arg(benchmark.short_opt,  benchmark.long_opt);
+                                          
+  use_gpu.active = has_arg(use_gpu.short_opt,  use_gpu.long_opt);
+                                          
+  gpu_dev.active = has_arg(gpu_dev.short_opt,  gpu_dev.long_opt);
+  if (gpu_dev.active)
+    gpu_dev.arg = get_arg(gpu_dev.short_opt,  gpu_dev.long_opt);
+                                          
+  extra_vb.active = has_arg(extra_vb.short_opt,  extra_vb.long_opt);
+                                          
+  work_items.active = has_arg(work_items.short_opt,  work_items.long_opt);
+  if (work_items.active)
+    work_items.arg = get_arg(work_items.short_opt,  work_items.long_opt);
+                                          
+  max_primes.active = has_arg(max_primes.short_opt,  max_primes.long_opt);
+  if (max_primes.active)
+    max_primes.arg = get_arg(max_primes.short_opt,  max_primes.long_opt);
+                                          
+  queue_size.active = has_arg(queue_size.short_opt,  queue_size.long_opt);
+  if (queue_size.active)
+    queue_size.arg = get_arg(queue_size.short_opt,  queue_size.long_opt);
                                           
   help.active = has_arg(help.short_opt,  help.long_opt);
   license.active = has_arg(license.short_opt,  license.long_opt);
@@ -248,6 +277,27 @@ string Opts::get_help()  {
 
   ss << "  " << shift.short_opt  << "  " << left << setw(18);
   ss << shift.long_opt << "  " << shift.description << "\n\n";
+
+  ss << "  " << benchmark.short_opt  << "  " << left << setw(18);
+  ss << benchmark.long_opt << "  " << benchmark.description << "\n\n";
+
+  ss << "  " << use_gpu.short_opt  << "  " << left << setw(18);
+  ss << use_gpu.long_opt << "  " << use_gpu.description << "\n\n";
+
+  ss << "  " << gpu_dev.short_opt  << "  " << left << setw(18);
+  ss << gpu_dev.long_opt << "  " << gpu_dev.description << "\n\n";
+
+  ss << "  " << extra_vb.short_opt  << "  " << left << setw(18);
+  ss << extra_vb.long_opt << "  " << extra_vb.description << "\n\n";
+
+  ss << "  " << work_items.short_opt  << "  " << left << setw(18);
+  ss << work_items.long_opt << "  " << work_items.description << "\n\n";
+
+  ss << "  " << max_primes.short_opt  << "  " << left << setw(18);
+  ss << max_primes.long_opt << "  " << max_primes.description << "\n\n";
+
+  ss << "  " << queue_size.short_opt  << "  " << left << setw(18);
+  ss << queue_size.long_opt << "  " << queue_size.description << "\n\n";
 
   ss << "  " << help.short_opt << "  " << left << setw(18);
   ss << help.long_opt << "  " << help.description << "\n\n";

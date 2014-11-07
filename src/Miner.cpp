@@ -32,6 +32,9 @@
 #include "PoWCore/src/PoWProcessor.h"
 #include "ShareProcessor.h"
 #include "PoWCore/src/Sieve.h"
+#include "Opts.h"
+#include "HybridSieve.h"
+#include "verbose.h"
 
 /* synchronization mutex */
 pthread_mutex_t Miner::mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -39,73 +42,98 @@ pthread_mutex_t Miner::mutex = PTHREAD_MUTEX_INITIALIZER;
 /* create a new miner */
 Miner::Miner(uint64_t sieve_size, 
              uint64_t sieve_primes, 
-             int n_threads,
-             uint64_t interval) {
+             int n_threads) {
 
   this->sieve_size   = sieve_size;
   this->sieve_primes = sieve_primes;
   this->n_threads    = n_threads;
-  this->interval     = interval;
   this->running      = false;
+  this->is_started   = false;
+  this->use_gpu      = Opts::get_instance()->has_use_gpu(); 
 
-  pps          = (double *)      calloc(n_threads, sizeof(double));
-  gaps10ph     = (double *)      calloc(n_threads, sizeof(double));
-  gaps15ph     = (double *)      calloc(n_threads, sizeof(double));
-  avg_pps      = (double *)      calloc(n_threads, sizeof(double));
-  avg_gaps10ph = (double *)      calloc(n_threads, sizeof(double));
-  avg_gaps15ph = (double *)      calloc(n_threads, sizeof(double));
   threads      = (pthread_t *)   calloc(n_threads, sizeof(pthread_t));
   args         = (ThreadArgs **) calloc(n_threads, sizeof(ThreadArgs *));
+
+  if (use_gpu)
+    this->n_threads = 1;
 }              
 
 /* start processing */
 void Miner::start(BlockHeader *header) {
 
   running = true;
-  ShareProcessor::get_processor()->update_header(header);
+  Opts *opts = Opts::get_instance();
+  bool use_gpu = opts->has_use_gpu(); 
+
+  uint64_t max_primes = (opts->has_max_primes() ? atoi(opts->get_max_primes().c_str()) : 30000000);
+  uint64_t work_items = (opts->has_work_items() ? atoi(opts->get_work_items().c_str()) : 2048);
+  uint64_t queue_size = (opts->has_queue_size() ? atoi(opts->get_queue_size().c_str()) : 10);
+
+  ShareProcessor *share_processor = ShareProcessor::get_processor();
+  share_processor->update_header(header);
 
   for (int i = 0; i < n_threads; i++) {
-    
+
     args[i] = new ThreadArgs(i, 
                              n_threads, 
-                             sieve_size, 
-                             sieve_primes, 
-                             pps,
-                             gaps10ph,
-                             gaps15ph,
-                             avg_pps,
-                             avg_gaps10ph,
-                             avg_gaps15ph,
-                             interval,
                              &running, 
                              header);
     
+    if (use_gpu) {
+      args[i]->hsieve = new HybridSieve((PoWProcessor *) share_processor, 
+                                        sieve_primes, 
+                                        sieve_size,
+                                        max_primes,
+                                        work_items,
+                                        queue_size);
+
+      memcpy(args[i]->hsieve->hash_prev_block, 
+             header->hash_prev_block,
+             SHA256_DIGEST_LENGTH);
+             
+    } else {
+      args[i]->sieve = new Sieve((PoWProcessor *) share_processor, 
+                                 sieve_primes, 
+                                 sieve_size);
+    }
+    
     pthread_create(&threads[i], NULL, miner, (void *) args[i]);
+
+    if (Opts::get_instance()->has_extra_vb()) {
+      pthread_mutex_lock(&io_mutex);
+      cout << get_time() << "Worker " << i << " started\n";
+      pthread_mutex_unlock(&io_mutex);
+    }
   }
+
+  is_started = true;
 }
 
 /* delete a miner */
 Miner::~Miner() {
   stop();
-
-  free(pps);
-  free(gaps10ph);
-  free(gaps15ph);
-  free(avg_pps);
-  free(avg_gaps10ph);
-  free(avg_gaps15ph);
-  free(threads);
-  free(args);
 }
 
 /* stops all threads and waits until they are finished */
 void Miner::stop() {
+
+  bool use_gpu = Opts::get_instance()->has_use_gpu(); 
+
   if (running) {
     running = false;
     
     for (int i = 0; i < n_threads; i++) {
+
+      if (use_gpu)
+        args[i]->hsieve->stop();
+
       pthread_join(threads[i], NULL);
       delete args[i]->header;
+
+      if (use_gpu)
+        delete args[i]->hsieve;
+      else
+        delete args[i]->sieve;
     }
   }
 }
@@ -113,8 +141,21 @@ void Miner::stop() {
 /* updates the BlockHeader for all threads */
 bool Miner::update_header(BlockHeader *header) {
   
+  if (!is_started) return false;
+
+  bool use_gpu = Opts::get_instance()->has_use_gpu(); 
+  
   if (!running)
     return false;
+
+  /* restart sieve  with new header */
+  for (int i = 0; use_gpu && i < n_threads; i++) {
+      memcpy(args[i]->hsieve->hash_prev_block, 
+             header->hash_prev_block,
+             SHA256_DIGEST_LENGTH);
+
+      args[i]->hsieve->stop();
+  }
 
   pthread_mutex_lock(&mutex);
   for (int i = 0; i < n_threads; i++) {
@@ -135,29 +176,11 @@ bool Miner::update_header(BlockHeader *header) {
 /* create a new ThreadArgs */
 Miner::ThreadArgs::ThreadArgs(int id, 
                               int n_threads, 
-                              uint64_t sieve_size,
-                              uint64_t sieve_primes,
-                              double *pps,
-                              double *gaps10ph,
-                              double *gaps15ph,
-                              double *avg_pps,
-                              double *avg_gaps10ph,
-                              double *avg_gaps15ph,
-                              uint64_t interval,
                               bool *running, 
                               BlockHeader *header) {
 
   this->id            = id;
   this->n_threads     = n_threads;
-  this->sieve_size    = sieve_size;
-  this->sieve_primes  = sieve_primes;
-  this->pps           = pps;
-  this->gaps10ph      = gaps10ph;
-  this->gaps15ph      = gaps15ph;
-  this->avg_pps       = avg_pps;
-  this->avg_gaps10ph  = avg_gaps10ph;
-  this->avg_gaps15ph  = avg_gaps15ph;
-  this->interval      = interval;
   this->running       = running;
   this->header        = header->clone();
   this->header->nonce = id;
@@ -165,7 +188,7 @@ Miner::ThreadArgs::ThreadArgs(int id,
 
 /* a single mining thread */
 void *Miner::miner(void *args) {
-
+  
 #ifndef WINDOWS
   /* use idle CPU cycles for mining */
   struct sched_param param;
@@ -175,21 +198,19 @@ void *Miner::miner(void *args) {
 
   
   ThreadArgs *targs = (ThreadArgs *) args;
+  bool use_gpu = Opts::get_instance()->has_use_gpu(); 
 
   mpz_t mpz_hash;
   mpz_init(mpz_hash);
-
-  uint64_t time = PoWUtils::gettime_usec();
-
-  ShareProcessor *share_processor = ShareProcessor::get_processor();
-  Sieve sieve((PoWProcessor *) share_processor, 
-              targs->sieve_primes, 
-              targs->sieve_size);
+  uint8_t hash_prev_block[SHA256_DIGEST_LENGTH];
 
   while (*targs->running) {
     
     pthread_mutex_lock(&mutex);
     targs->header->get_hash(mpz_hash);
+    memcpy(hash_prev_block,
+           targs->header->hash_prev_block,
+           SHA256_DIGEST_LENGTH);
     
     /* hash has to be in range (2^255, 2^256) */
     while (mpz_sizeinbase(mpz_hash, 2) != 256) {
@@ -206,19 +227,10 @@ void *Miner::miner(void *args) {
             targs->header->target, 
             targs->header->nonce);
 
-    sieve.run_sieve(&pow, NULL);
-
-    /* measure speed */
-    if ((PoWUtils::gettime_usec() - time) > targs->interval) {
-
-      targs->pps[targs->id]          = sieve.primes_per_sec();
-      targs->gaps10ph[targs->id]     = sieve.gaps10_per_hour();
-      targs->gaps15ph[targs->id]     = sieve.gaps15_per_hour();
-      targs->avg_pps[targs->id]      = sieve.avg_primes_per_sec();
-      targs->avg_gaps10ph[targs->id] = sieve.avg_gaps10_per_hour();
-      targs->avg_gaps15ph[targs->id] = sieve.avg_gaps15_per_hour();
-      time                           = PoWUtils::gettime_usec();
-    }
+    if (use_gpu)
+      targs->hsieve->run_sieve(&pow, NULL, hash_prev_block);
+    else
+      targs->sieve->run_sieve(&pow, NULL);
 
     pthread_mutex_lock(&mutex);
     targs->header->nonce += targs->n_threads;
@@ -227,18 +239,27 @@ void *Miner::miner(void *args) {
   
   mpz_clear(mpz_hash);
 
+  if (use_gpu)
+    delete targs->hsieve;
+  else
+    delete targs->sieve;
+
   return NULL;
 }
-
 
 /**
  * returns the average primes per seconds
  */
 double Miner::avg_primes_per_sec() {
   
+  if (!is_started) return 0;
+  
   double apps = 0;
   for (int i = 0; i < n_threads; i++)
-    apps += avg_pps[i];
+    if (use_gpu)
+      apps += args[i]->hsieve->avg_primes_per_sec();
+    else
+      apps += args[i]->sieve->avg_primes_per_sec();
 
   return apps;
 }
@@ -249,9 +270,14 @@ double Miner::avg_primes_per_sec() {
  */
 double Miner::avg_gaps10_per_hour() {
   
+  if (!is_started) return 0;
+  
   double ag10 = 0;
   for (int i = 0; i < n_threads; i++)
-    ag10 += avg_gaps10ph[i];
+    if (use_gpu)
+      ag10 += args[i]->hsieve->avg_gaps10_per_hour();
+    else
+      ag10 += args[i]->sieve->avg_gaps10_per_hour();
 
   return ag10;
 }
@@ -261,9 +287,14 @@ double Miner::avg_gaps10_per_hour() {
  */
 double Miner::avg_gaps15_per_hour() {
   
+  if (!is_started) return 0;
+  
   double ag15 = 0;
   for (int i = 0; i < n_threads; i++)
-    ag15 += avg_gaps15ph[i];
+    if (use_gpu)
+      ag15 += args[i]->hsieve->avg_gaps15_per_hour();
+    else
+      ag15 += args[i]->sieve->avg_gaps15_per_hour();
 
   return ag15;
 }
@@ -273,11 +304,16 @@ double Miner::avg_gaps15_per_hour() {
  */
 double Miner::primes_per_sec() {
   
-  double all_pps = 0;
+  if (!is_started) return 0;
+  
+  double pps = 0;
   for (int i = 0; i < n_threads; i++)
-    all_pps += pps[i];
+    if (use_gpu)
+      pps += args[i]->hsieve->primes_per_sec();
+    else
+      pps += args[i]->sieve->primes_per_sec();
 
-  return all_pps;
+  return pps;
 }
 
 
@@ -286,9 +322,14 @@ double Miner::primes_per_sec() {
  */
 double Miner::gaps10_per_hour() {
   
+  if (!is_started) return 0;
+  
   double g10 = 0;
   for (int i = 0; i < n_threads; i++)
-    g10 += gaps10ph[i];
+    if (use_gpu)
+      g10 += args[i]->hsieve->gaps10_per_hour();
+    else
+      g10 += args[i]->sieve->gaps10_per_hour();
 
   return g10;
 }
@@ -298,14 +339,19 @@ double Miner::gaps10_per_hour() {
  */
 double Miner::gaps15_per_hour() {
   
+  if (!is_started) return 0;
+  
   double g15 = 0;
   for (int i = 0; i < n_threads; i++)
-    g15 += gaps15ph[i];
+    if (use_gpu)
+      g15 += args[i]->hsieve->gaps15_per_hour();
+    else
+      g15 += args[i]->sieve->gaps15_per_hour();
 
   return g15;
 }
 
 /**
- * returns wether this is running
+ * returns whether this is running
  */
-bool Miner::started() { return running; }
+bool Miner::started() { return is_started && running; }

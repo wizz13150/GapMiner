@@ -20,6 +20,7 @@
 #define __MINER_H__
 #include <pthread.h>
 #include "BlockHeader.h"
+#include "HybridSieve.h"
 
 
 class Miner {
@@ -29,8 +30,7 @@ class Miner {
     /* create a new miner */
     Miner(uint64_t sieve_size, 
           uint64_t sieve_primes, 
-          int n_threads, 
-          uint64_t interval = 60000000);
+          int n_threads);
 
     /* delete a miner */
     ~Miner();
@@ -75,7 +75,7 @@ class Miner {
     double gaps15_per_hour();
 
     /**
-     * returns wether this is running
+     * returns whether this is running
      */
     bool started();
 
@@ -93,26 +93,11 @@ class Miner {
     /* indicates if this should run */
     bool running;
 
-    /* current primes per second */
-    double *pps;
+    /* indicates if this is started */
+    bool is_started;
 
-    /* current gaps > 10 per hour */
-    double *gaps10ph;
-
-    /* current gaps > 15 per hour */
-    double *gaps15ph;
-
-    /* overall primes per second */
-    double *avg_pps;
-
-    /* overall gaps > 10 per hour */
-    double *avg_gaps10ph;
-
-    /* overall gaps > 15 per hour */
-    double *avg_gaps15ph;
-
-    /* stats interval */
-    uint64_t interval;
+    /* indicates if we should use gpu or not */
+    bool use_gpu;
 
     /* synchronization mutex */
     static pthread_mutex_t mutex;       
@@ -131,51 +116,21 @@ class Miner {
         /* number of threads */
         int n_threads;
 
-        /* sieve size */
-        uint64_t sieve_size;
-       
-        /* sieve primes */
-        uint64_t sieve_primes;
-
-        /* current primes per second */
-        double *pps;
-        
-        /* current gaps > 10 per hour */
-        double *gaps10ph;
-        
-        /* current gaps > 15 per hour */
-        double *gaps15ph;
-        
-        /* overall primes per second */
-        double *avg_pps;
-        
-        /* overall gaps > 10 per hour */
-        double *avg_gaps10ph;
-        
-        /* overall gaps > 15 per hour */
-        double *avg_gaps15ph;
-
-        /* stats interval */
-        uint64_t interval;
-
         /* indicates if this should run */
         bool *running;
 
         /* the Block header to mine for */
         BlockHeader *header;
 
+        /* the HybridSieve for this */
+        HybridSieve *hsieve;
+
+        /* the Sieve for this */
+        Sieve *sieve;
+
         /* create a new ThreadArgs */
         ThreadArgs(int id, 
                    int n_threads,
-                   uint64_t sieve,
-                   uint64_t sieve_primes,
-                   double *pps,
-                   double *gaps10ph,
-                   double *gaps15ph,
-                   double *avg_pps,
-                   double *avg_gaps10ph,
-                   double *avg_gaps15ph,
-                   uint64_t interval,
                    bool *running, 
                    BlockHeader *header);
     };

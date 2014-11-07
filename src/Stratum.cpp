@@ -25,6 +25,8 @@
 #include "Stratum.h"
 #include "verbose.h"
 
+#include "Opts.h"
+
 using boost::asio::ip::tcp;
 using namespace std;
 
@@ -228,6 +230,12 @@ void *Stratum::recv_thread(void *arg) {
   map<int, double> *shares = targs->shares;
 
   boost::asio::streambuf buffer;
+
+  if (Opts::get_instance()->has_extra_vb()) {
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "Stratum thread started\n";
+    pthread_mutex_unlock(&io_mutex);
+  }
 
   while (targs->running) {
     

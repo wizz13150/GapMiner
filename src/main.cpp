@@ -34,6 +34,7 @@
 #include "Rpc.h"
 #include "verbose.h"
 #include "Stratum.h"
+#include "GPUFermat.h"
 
 using namespace std;
 
@@ -97,9 +98,16 @@ void init_signal() {
 
 /* periodically look if new work is available */
 void *getwork_thread(void *arg) {
-  
+
   Miner *miner = (Miner *) arg;
   Opts  *opts  = Opts::get_instance();
+
+  if (opts->has_extra_vb()) {
+    pthread_mutex_lock(&io_mutex);
+    cout << get_time() << "Getwork thread started\n";
+    pthread_mutex_unlock(&io_mutex);
+  }
+  
 
   Rpc *rpc            = Rpc::get_instance();
   BlockHeader *header = rpc->getwork();
@@ -127,6 +135,9 @@ void *getwork_thread(void *arg) {
 
   uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 20);
   header->shift  = shift;
+
+  if (opts->has_use_gpu())
+    shift = 64;
   
 
   /* start mining */
@@ -206,6 +217,12 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+  if (opts->has_benchmark()) {
+    GPUFermat *fermat = GPUFermat::get_instance();
+    fermat->benchmark();
+    exit(EXIT_SUCCESS);
+  }
+
   if (opts->has_help()  ||
       !opts->has_host() ||
       !opts->has_port() ||
@@ -255,7 +272,21 @@ int main(int argc, char *argv[]) {
                          atoll(opts->get_primes().c_str()) :
                          500000);
 
-  miner = new Miner(sieve_size, primes, n_threads, ((uint64_t) sec) * 1000000L);
+  if (opts->has_use_gpu()) {
+
+    sieve_size = (opts->has_sievesize() ? 
+                  atoll(opts->get_sievesize().c_str()) :
+                  15000000); 
+ 
+    primes     = (opts->has_primes() ? 
+                 atoll(opts->get_primes().c_str()) :
+                 1500000);
+
+    shift = 64;
+  }
+ 
+
+  miner = new Miner(sieve_size, primes, n_threads);
   pthread_t thread;
 
   if (opts->has_stratum()) {

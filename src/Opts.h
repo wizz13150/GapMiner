@@ -81,6 +81,13 @@ class Opts {
     SingleOpt sievesize;
     SingleOpt primes;
     SingleOpt shift;
+    SingleOpt benchmark;
+    SingleOpt use_gpu;
+    SingleOpt gpu_dev;
+    SingleOpt extra_vb;
+    SingleOpt work_items;
+    SingleOpt max_primes;
+    SingleOpt queue_size;
     SingleOpt help;
     SingleOpt license;
 
@@ -99,46 +106,64 @@ class Opts {
     static Opts *get_instance(int argc = 0, char *argv[] = NULL);
 
     /* read functions */
-    bool has_host()        { return host.active;      }
-    string get_host()      { return host.arg;         }
-                                                      
-    bool has_port()        { return port.active;      }
-    string get_port()      { return port.arg;         }
-                                                      
-    bool has_user()        { return user.active;      }
-    string get_user()      { return user.arg;         }
-                                                      
-    bool has_pass()        { return pass.active;      }
-    string get_pass()      { return pass.arg;         }
-                                                      
-    bool has_quiet()       { return quiet.active;     }
-                                                      
-    bool has_stats()       { return stats.active;     }
-    string get_stats()     { return stats.arg;        }
-                                                      
-    bool has_threads()     { return threads.active;   }
-    string get_threads()   { return threads.arg;      }
-                                                      
-    bool has_pull()        { return pull.active;      }
-    string get_pull()      { return pull.arg;         }
+    bool has_host()         { return host.active;       }
+    string get_host()       { return host.arg;          }
+                                                        
+    bool has_port()         { return port.active;       }
+    string get_port()       { return port.arg;          }
+                                                        
+    bool has_user()         { return user.active;       }
+    string get_user()       { return user.arg;          }
+                                                        
+    bool has_pass()         { return pass.active;       }
+    string get_pass()       { return pass.arg;          }
+                                                        
+    bool has_quiet()        { return quiet.active;      }
+                                                        
+    bool has_stats()        { return stats.active;      }
+    string get_stats()      { return stats.arg;         }
+                                                        
+    bool has_threads()      { return threads.active;    }
+    string get_threads()    { return threads.arg;       }
+                                                        
+    bool has_pull()         { return pull.active;       }
+    string get_pull()       { return pull.arg;          }
+                                                        
+    bool has_timeout()      { return timeout.active;    }
+    string get_timeout()    { return timeout.arg;       }
+                                                        
+    bool has_stratum()      { return stratum.active;    }
+                                                        
+    bool has_sievesize()    { return sievesize.active;  }
+    string get_sievesize()  { return sievesize.arg;     }
+                                                        
+    bool has_primes()       { return primes.active;     }
+    string get_primes()     { return primes.arg;        }
+                                                        
+    bool has_shift()        { return shift.active;      }
+    string get_shift()      { return shift.arg;         }
+                                                        
+    bool has_benchmark()    { return benchmark.active;  }
+                                                        
+    bool has_use_gpu()      { return use_gpu.active;    }
+                                                        
+    bool has_gpu_dev()      { return gpu_dev.active;    }
+    string get_gpu_dev()    { return gpu_dev.arg;       }
+                                                   
+    bool has_extra_vb()     { return extra_vb.active;   }
+                                                   
+    bool has_work_items()   { return work_items.active; }
+    string get_work_items() { return work_items.arg;    }
                                                   
-    bool has_timeout()     { return timeout.active;   }
-    string get_timeout()   { return timeout.arg;      }
+    bool has_max_primes()   { return max_primes.active; }
+    string get_max_primes() { return max_primes.arg;    }
                                                   
-    bool has_stratum()     { return stratum.active;   }
+    bool has_queue_size()   { return queue_size.active; }
+    string get_queue_size() { return queue_size.arg;    }
                                                   
-    bool has_sievesize()   { return sievesize.active; }
-    string get_sievesize() { return sievesize.arg;    }
-                                                  
-    bool has_primes()      { return primes.active;    }
-    string get_primes()    { return primes.arg;       }
-                                                  
-    bool has_shift()       { return shift.active;     }
-    string get_shift()     { return shift.arg;        }
-                                                  
-    bool has_help()        { return help.active;      }
-
-    bool has_license()     { return license.active;   }
+    bool has_help()         { return help.active;       }
+                                                        
+    bool has_license()      { return license.active;    }
                                                     
     /* get help */                                
     string get_help();                            
