@@ -221,7 +221,11 @@ int main(int argc, char *argv[]) {
 
 #ifndef CPU_ONLY
   if (opts->has_benchmark()) {
-    GPUFermat *fermat = GPUFermat::get_instance();
+    unsigned dev_id = (opts->has_gpu_dev() ? atoi(opts->get_gpu_dev().c_str()) : 0);
+    string platfrom  = (opts->has_platform() ? string(opts->get_platform()) : "amd");
+    unsigned workItems = (opts->has_work_items() ? atoi(opts->get_work_items().c_str()) : 2048);
+
+    GPUFermat *fermat = GPUFermat::get_instance(dev_id, platfrom.c_str(), workItems);
     fermat->benchmark();
     exit(EXIT_SUCCESS);
   }
@@ -291,8 +295,9 @@ int main(int argc, char *argv[]) {
 
     unsigned dev_id = (opts->has_gpu_dev() ? atoi(opts->get_gpu_dev().c_str()) : 0);
     string platfrom  = (opts->has_platform() ? string(opts->get_platform()) : "amd");
+    unsigned workItems = (opts->has_work_items() ? atoi(opts->get_work_items().c_str()) : 2048);
 
-    GPUFermat::get_instance(dev_id, platfrom.c_str());
+    GPUFermat::get_instance(dev_id, platfrom.c_str(), workItems);
   }
 #endif
  

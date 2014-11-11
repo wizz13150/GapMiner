@@ -56,19 +56,21 @@ static cl_context gContext;
 /* the GPU work group size */
 unsigned GPUFermat::GroupSize = 256;
 
-/* the work items for the gpu */
-unsigned GPUFermat::workItems = 2048;
-
 /* the array size of uint32_t for the numbers to test */
 unsigned GPUFermat::operandSize = 320/32;
 
 /* return the only instance of this */
 GPUFermat *GPUFermat::get_instance(unsigned device_id, 
-                                   const char *platformId) {
+                                   const char *platformId,
+                                   unsigned workItems) {
 
   pthread_mutex_lock(&creation_mutex);
-  if (!initialized && device_id != (unsigned)(-1) && platformId != NULL) {
-    only_instance = new GPUFermat(device_id, platformId);
+  if (!initialized && 
+      device_id != (unsigned)(-1) && 
+      platformId != NULL &&
+      workItems != 0) {
+
+    only_instance = new GPUFermat(device_id, platformId, workItems);
     initialized   = true;
   }
   pthread_mutex_unlock(&creation_mutex);
@@ -77,7 +79,11 @@ GPUFermat *GPUFermat::get_instance(unsigned device_id,
 }
 
 /* initialize this */
-GPUFermat::GPUFermat(unsigned device_id, const char *platformId) {
+GPUFermat::GPUFermat(unsigned device_id, 
+                     const char *platformId, 
+                     unsigned workItems) {
+
+  this->workItems = workItems;
   init_cl(device_id, platformId);
 
   elementsNum = GroupSize * workItems;

@@ -60,11 +60,12 @@ class GPUFermat {
     /* the GPU work group size */
     static unsigned GroupSize;
 
-    /* the work items for the gpu */
-    static unsigned workItems;
-
     /* the array size of uint32_t for the numbers to test */
     static unsigned operandSize;
+
+    /* the work items for the gpu */
+    unsigned workItems;
+
 
     /* the number of prime candidates to test at once */
     unsigned elementsNum;
@@ -97,7 +98,7 @@ class GPUFermat {
     cl_command_queue queue;
 
     /* this is a singleton */
-    GPUFermat(unsigned device_id, const char *platformId);
+    GPUFermat(unsigned device_id, const char *platformId, unsigned workItems);
 
 
     /* initialize opencl for the given device */
@@ -127,7 +128,8 @@ class GPUFermat {
 
     /* return the only instance of this */
     static GPUFermat *get_instance(unsigned device_id = (unsigned)(-1), 
-                                   const char *platformId = NULL);
+                                   const char *platformId = NULL,
+                                   unsigned workItems = 0);
 
     /* public interface to the gpu Fermat test */
     void fermat_gpu(uint32_t *candidates, bool *results);

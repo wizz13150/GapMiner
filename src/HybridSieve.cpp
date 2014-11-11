@@ -124,6 +124,9 @@ HybridSieve::HybridSieve(PoWProcessor *pprocessor,
   this->input  = new GPUQueue((queue_size < 2) ? 2 : queue_size);
   this->output = new GPUQueue((queue_size < 2) ? 2 : queue_size);
 
+  this->passed_time      = 1;
+  this->cur_passed_time  = 1;
+
   targs.input            = input;
   targs.output           = output;
   targs.running          = true;
@@ -177,7 +180,7 @@ void HybridSieve::run_sieve(PoW *pow,
   
   running = true;
   
-  /* just to be share */
+  /* just to be sure */
   pow->set_shift(64);
 
   mpz_t mpz_offset;
@@ -441,7 +444,7 @@ void *HybridSieve::gpu_results_thread(void *args) {
       *targs->cur_found_primes = 0;
       *targs->cur_gaps10       = 0;
       *targs->cur_gaps15       = 0;
-      *targs->cur_passed_time  = 0;
+      *targs->cur_passed_time  = 1;
     }
 
     mpz_import(mpz_hash, gpu_op_size, -1, 4, 0, 0, work->candidates);
@@ -453,14 +456,13 @@ void *HybridSieve::gpu_results_thread(void *args) {
     mpz_mul_2exp(mpz_start, mpz_start, 64);
     
 
-    ssieve_t last_prime = targs->sievesize;
+    ssieve_t last_prime = 1 << 31;
     ssieve_t min_len    = pow.target_size(mpz_start);
     ssieve_t min10_len  = targs->utils->target_size(mpz_start, 10 * TWO_POW48);
     ssieve_t min15_len  = targs->utils->target_size(mpz_start, 15 * TWO_POW48);
     ssieve_t cur_prime  = 0;
  
-    /* run primality test for all remaining prime candidates
-     * (only check odd numbers )
+    /* scan gpu results for a large prime gap
      */
     for (sieve_t i = 0; i < gpu_groub_size * targs->work_items; i++) {
       

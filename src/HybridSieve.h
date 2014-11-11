@@ -53,7 +53,7 @@ class HybridSieve : public Sieve {
                 uint64_t sievesize,
                 uint64_t max_primes = 30000000,
                 uint64_t work_items = 2048,
-                uint64_t queue_size = 10);
+                uint64_t queue_size = 5);
 
     ~HybridSieve();
 
