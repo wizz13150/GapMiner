@@ -93,9 +93,22 @@ GPUFermat::GPUFermat(unsigned device_id,
   groupsNum = computeUnits * 4;
 
   /* init Fermat buffers */
-  numbers.init(numberLimbsNum, CL_MEM_READ_WRITE);
-  gpuResults.init(numberLimbsNum, CL_MEM_READ_WRITE);
+  numbers.init(elementsNum, CL_MEM_READ_WRITE);
+  gpuResults.init(elementsNum, CL_MEM_READ_WRITE);
+  primeBase.init(operandSize, CL_MEM_READ_WRITE);
 
+}
+
+uint32_t *GPUFermat::get_results_buffer() {
+  return gpuResults.HostData;
+}
+
+uint32_t *GPUFermat::get_prime_base_buffer() {
+  return primeBase.HostData;
+}
+
+uint32_t *GPUFermat::get_candidates_buffer() {
+  return numbers.HostData;
 }
 
 bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
@@ -310,7 +323,10 @@ bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
   }
   */
   
-  mFermatKernel320 = clCreateKernel(gProgram, "fermatTestBenchMark320", &error);  
+  mFermatBenchmarkKernel320 = clCreateKernel(gProgram, "fermatTestBenchMark320", &error);  
+  OCLR(error, false);
+
+  mFermatKernel320 = clCreateKernel(gProgram, "fermatTest320", &error);  
   OCLR(error, false);
   
   char deviceName[128] = {0};
@@ -340,6 +356,9 @@ bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
 /* run a benchmark test */
 void GPUFermat::benchmark() {
 
+  test_gpu();
+  return;
+
   for (int i = 1; i <= 10; i++) {
     
     clBuffer numbers;
@@ -356,7 +375,7 @@ void GPUFermat::benchmark() {
     }
 
 
-    fermatTestBenchmark(queue, mFermatKernel320, numbers, elementsNum);
+    fermatTestBenchmark(queue, mFermatBenchmarkKernel320, numbers, elementsNum);
   }
 }
 
@@ -426,30 +445,89 @@ uint32_t &GPUFermat::clBuffer::operator[](int index) {
   return HostData[index];
 }
 
+/* public interface to the gpu Fermat test */
+void GPUFermat::fermat_gpu() {
+  
+  run_fermat(queue, mFermatKernel320, numbers, gpuResults, elementsNum);
+  gpuResults.copyToHost(queue);
+  clFinish(queue);
+}
+
+/* run the Fermat test on the gpu */
+void GPUFermat::run_fermat(cl_command_queue queue,
+                           cl_kernel kernel,
+                           clBuffer &numbers,
+                           clBuffer &gpuResults,
+                           unsigned elementsNum) {
+
+  numbers.copyToDevice(queue);
+  gpuResults.copyToDevice(queue);
+  primeBase.copyToDevice(queue);
+
+  clSetKernelArg(kernel, 0, sizeof(cl_mem), &numbers.DeviceData);
+  clSetKernelArg(kernel, 1, sizeof(cl_mem), &gpuResults.DeviceData);
+  clSetKernelArg(kernel, 2, sizeof(cl_mem), &primeBase.DeviceData);
+  clSetKernelArg(kernel, 3, sizeof(elementsNum), &elementsNum);
+  
+  clFinish(queue);
+  {
+    size_t globalThreads[1] = { groupsNum*GroupSize };
+    size_t localThreads[1] = { GroupSize };
+    cl_event event;
+    cl_int result;
+    if ((result = clEnqueueNDRangeKernel(queue,
+                                         kernel,
+                                         1,
+                                         0,
+                                         globalThreads,
+                                         localThreads,
+                                         0, 0, &event)) != CL_SUCCESS) {
+      pthread_mutex_lock(&io_mutex);                            
+      cout << get_time() << "clEnqueueNDRangeKernel error!" << endl;
+      pthread_mutex_unlock(&io_mutex);                       
+      return;
+    }
+      
+    cl_int error;
+    if ((error = clWaitForEvents(1, &event)) != CL_SUCCESS) {
+      pthread_mutex_lock(&io_mutex);                            
+      cout << get_time() << "clWaitForEvents error " << error << "!" << endl;
+      pthread_mutex_unlock(&io_mutex);                       
+      return;
+    }
+      
+    clReleaseEvent(event);
+  }
+}
+
 /* test the gpu results */
 void GPUFermat::test_gpu() {
 
     unsigned size = elementsNum;
-    uint32_t *primes =  (uint32_t *) malloc(sizeof(uint32_t) * size * 10);
-    bool     *results = (bool *) malloc(sizeof(bool) * size);
+    uint32_t *prime_base = primeBase.HostData;
+    uint32_t *primes  = numbers.HostData;
+    uint32_t *results = gpuResults.HostData;
 
     mpz_t mpz;
     mpz_init_set_ui(mpz, rand32());
 
     /* init with random number */
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 8; i++) {
       mpz_mul_2exp(mpz, mpz, 32);
       mpz_add_ui(mpz, mpz, rand32());
     }
 
-    /* make sure mpz is not a prime */
+    /* make shure mpz is not a prime */
     if (mpz_get_ui(mpz) & 0x1)
       mpz_add_ui(mpz, mpz, 1);
+
+    size_t exported_size;
+    mpz_export(prime_base, &exported_size, -1, 4, 0, 0, mpz);
   
-    /* create the test numbers, every second will be prime */
+    /* creat the test numbers, every second will be prime */
     for (unsigned i = 0; i < size; i++) {
-      size_t exported_size;
-      mpz_export(&primes[i*10], &exported_size, -1, 4, 0, 0, mpz);
+
+      primes[i] = mpz_get_ui(mpz) & 0xffffffff;
 
       if (i % 2 == 0)
         mpz_nextprime(mpz, mpz);
@@ -459,58 +537,36 @@ void GPUFermat::test_gpu() {
       if (i % 23 == 0)
         printf("\rcreating test data: %d  \r", size - i);
     }
+    printf("\r                                             \r");
 
     /* run the gpu test */
-    fermat_gpu(primes, results);
+    fermat_gpu();
 
     /* check the results */
     for (unsigned i = 0; i < size; i++) {
 
       bool fail = false;
 
-      if (i % 2 == 0 && results[i] == true)
+      if (i % 2 == 0 && results[i] != 0)
         fail = true;
-      else if (i % 2 == 1 && results[i] == false)
+      else if (i % 2 == 1 && results[i] != 1)
         fail = true;
 
       if (fail) {
-        printf("Result %d is wrong\n", i);
+        printf("Result %d is wrong: %d\n", i, results[i]);
         return;
-      }
+      } 
    }
 
    printf("GPU Test worked              \n");
 }
 
-/* public interface to the gpu Fermat test */
-void GPUFermat::fermat_gpu(uint32_t *candidates, bool *results) {
-  
-  memcpy(numbers.HostData, candidates, numberLimbsNum * sizeof(uint32_t));
-  run_fermat(queue, mFermatKernel320, numbers, gpuResults, elementsNum);
-
-  gpuResults.copyToHost(queue);
-  clFinish(queue);
-
-  for (unsigned i = 0; i < elementsNum; i++) {
-    results[i] = (gpuResults[i*operandSize] == 1) &&
-                 (gpuResults[i*operandSize + 1] == 0) &&
-                 (gpuResults[i*operandSize + 2] == 0) &&
-                 (gpuResults[i*operandSize + 3] == 0) &&
-                 (gpuResults[i*operandSize + 4] == 0) &&
-                 (gpuResults[i*operandSize + 5] == 0) &&
-                 (gpuResults[i*operandSize + 6] == 0) &&
-                 (gpuResults[i*operandSize + 7] == 0) &&
-                 (gpuResults[i*operandSize + 8] == 0) &&
-                 (gpuResults[i*operandSize + 9] == 0);
-  }
-}
-
 /* run the Fermat test on the gpu */
-void GPUFermat::run_fermat(cl_command_queue queue,
-                           cl_kernel kernel,
-                           clBuffer &numbers,
-                           clBuffer &gpuResults,
-                           unsigned elementsNum) {
+void GPUFermat::run_fermat_benchmark(cl_command_queue queue,
+                                     cl_kernel kernel,
+                                     clBuffer &numbers,
+                                     clBuffer &gpuResults,
+                                     unsigned elementsNum) {
 
   numbers.copyToDevice(queue);
   gpuResults.copyToDevice(queue);
@@ -578,7 +634,7 @@ void GPUFermat::fermatTestBenchmark(cl_command_queue queue,
   }
   
   auto gpuBegin = std::chrono::steady_clock::now();  
-  run_fermat(queue, kernel, numbers, gpuResults, elementsNum);
+  run_fermat_benchmark(queue, kernel, numbers, gpuResults, elementsNum);
   auto gpuEnd = std::chrono::steady_clock::now();  
   
   

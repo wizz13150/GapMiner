@@ -122,7 +122,7 @@ user(      "-u", "--user",           "user for gapcoin rpc authentification",   
 pass(      "-x", "--pwd",            "password for gapcoin rpc authentification",     true),
 quiet(     "-q", "--quiet",          "be quiet (only prints shares)",                 false),
 extra_vb(  "-e", "--extra-verbose",  "additional verbose output",                     false),
-stats(     "-i", "--stats-interval", "interval (sec) to print mining informations",   true),
+stats(     "-j", "--stats-interval", "interval (sec) to print mining informations",   true),
 threads(   "-t", "--threads",        "number of mining threads",                      true),
 pull(      "-l", "--pull-interval",  "seconds to wait between getwork request",       true),
 timeout(   "-m", "--timeout",        "seconds to wait for server to respond",         true),
@@ -135,9 +135,9 @@ benchmark( "-b", "--benchmark",      "run a gpu benchmark",                     
 use_gpu(   "-g", "--use-gpu",        "use the gpu for Fermat testing",                false),
 gpu_dev(   "-d", "--gpu-dev",        "the gpu device id",                             true),
 work_items("-w", "--work-items",     "gpu work items (default 2048)",                 true),
-max_primes("-a", "--max-primes",     "maximum sieve primes (for use with gpu)",       true),
 queue_size("-z", "--queue-size",     "the gpu waiting queue size (memory intensive)", true),
 platform(  "-a", "--platform",       "opencl platform (amd or nvidia)",               true),
+n_tests(   "-n", "--num-gpu-tests",  "the number of test per gap per gpu run",        true),
 #endif
 help(      "-h", "--help",           "print this information",                        false),
 license(   "-v", "--license",        "show license of this program",                  false) {
@@ -206,10 +206,6 @@ license(   "-v", "--license",        "show license of this program",            
   if (work_items.active)
     work_items.arg = get_arg(work_items.short_opt,  work_items.long_opt);
                                           
-  max_primes.active = has_arg(max_primes.short_opt,  max_primes.long_opt);
-  if (max_primes.active)
-    max_primes.arg = get_arg(max_primes.short_opt,  max_primes.long_opt);
-                                          
   queue_size.active = has_arg(queue_size.short_opt,  queue_size.long_opt);
   if (queue_size.active)
     queue_size.arg = get_arg(queue_size.short_opt,  queue_size.long_opt);
@@ -217,6 +213,10 @@ license(   "-v", "--license",        "show license of this program",            
   platform.active = has_arg(platform.short_opt,  platform.long_opt);
   if (platform.active)
     platform.arg = get_arg(platform.short_opt,  platform.long_opt);
+
+  n_tests.active = has_arg(n_tests.short_opt,  n_tests.long_opt);
+  if (n_tests.active)
+    n_tests.arg = get_arg(n_tests.short_opt,  n_tests.long_opt);
 #endif    
                                           
   help.active = has_arg(help.short_opt,  help.long_opt);
@@ -303,14 +303,14 @@ string Opts::get_help()  {
   ss << "  " << work_items.short_opt  << "  " << left << setw(18);
   ss << work_items.long_opt << "  " << work_items.description << "\n\n";
 
-  ss << "  " << max_primes.short_opt  << "  " << left << setw(18);
-  ss << max_primes.long_opt << "  " << max_primes.description << "\n\n";
-
   ss << "  " << queue_size.short_opt  << "  " << left << setw(18);
   ss << queue_size.long_opt << "  " << queue_size.description << "\n\n";
 
   ss << "  " << platform.short_opt  << "  " << left << setw(18);
   ss << platform.long_opt << "  " << platform.description << "\n\n";
+
+  ss << "  " << n_tests.short_opt  << "  " << left << setw(18);
+  ss << n_tests.long_opt << "  " << n_tests.description << "\n\n";
 #endif  
 
   ss << "  " << help.short_opt << "  " << left << setw(18);

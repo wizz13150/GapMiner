@@ -82,8 +82,14 @@ class GPUFermat {
     /* the gpu fermat results */
     clBuffer gpuResults;
     
+    /* the prime base */
+    clBuffer primeBase;
+
     /* the opencl program */
     cl_program gProgram;
+
+    /* the fermat kernel to run on the gpu */
+    cl_kernel mFermatBenchmarkKernel320;  
 
     /* the fermat kernel to run on the gpu */
     cl_kernel mFermatKernel320;  
@@ -110,13 +116,19 @@ class GPUFermat {
 
     uint32_t rand32();
 
-
     /* run the Fermat test on the gpu */
     void run_fermat(cl_command_queue queue,
                     cl_kernel kernel,
                     clBuffer &numbers,
                     clBuffer &gpuResults,
                     unsigned elementsNum);
+
+    /* run the Fermat test on the gpu */
+    void run_fermat_benchmark(cl_command_queue queue,
+                              cl_kernel kernel,
+                              clBuffer &numbers,
+                              clBuffer &gpuResults,
+                              unsigned elementsNum);
 
     /* run a benchmark and print results */
     void fermatTestBenchmark(cl_command_queue queue,
@@ -126,19 +138,29 @@ class GPUFermat {
 
   public :
 
+    /* returns a pointer to the gpu results (host) buffer */
+    uint32_t *get_results_buffer();
+
+    /* returns a pointer to the prime_base (host) buffer */
+    uint32_t *get_prime_base_buffer();
+
+    /* returns a pointer to the candidates (host) buffer */
+    uint32_t *get_candidates_buffer();
+
     /* return the only instance of this */
     static GPUFermat *get_instance(unsigned device_id = (unsigned)(-1), 
                                    const char *platformId = NULL,
                                    unsigned workItems = 0);
 
     /* public interface to the gpu Fermat test */
-    void fermat_gpu(uint32_t *candidates, bool *results);
+    void fermat_gpu();
 
     /* run a benchmark test */
     void benchmark();
 
     /* test the gpu results */
     void test_gpu();
+
 };
 #endif /* __GPU_FERMAT_H__ */
 #endif /* CPU_ONLY */

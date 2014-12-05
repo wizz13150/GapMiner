@@ -285,11 +285,11 @@ int main(int argc, char *argv[]) {
 
     sieve_size = (opts->has_sievesize() ? 
                   atoll(opts->get_sievesize().c_str()) :
-                  15000000); 
+                  12000000); 
  
     primes     = (opts->has_primes() ? 
                  atoll(opts->get_primes().c_str()) :
-                 1500000);
+                 3000000);
 
     shift = 64;
 
@@ -319,12 +319,10 @@ int main(int argc, char *argv[]) {
     if (!opts->has_quiet() && !waiting) {
       pthread_mutex_lock(&io_mutex);
       cout << get_time();
-      cout << "pps: "    << (int) miner->primes_per_sec();
-      cout << " / "      << (int) miner->avg_primes_per_sec();
-      cout << "  10g/h " << (int) miner->gaps10_per_hour();
-      cout << " / "      << (int) miner->avg_gaps10_per_hour();
-      cout << "  15g/h " << (int) miner->gaps15_per_hour();
-      cout << " / "      << (int) miner->avg_gaps15_per_hour() << endl;
+      cout << "pps: "      << (int) miner->primes_per_sec();
+      cout << " / "        << (int) miner->avg_primes_per_sec();
+      cout << "  tests/s " << (int) miner->tests_per_second();
+      cout << " / "        << (int) miner->avg_tests_per_second() << endl;
       pthread_mutex_unlock(&io_mutex);
     }
   }

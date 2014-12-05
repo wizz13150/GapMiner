@@ -16,6 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef __OPTS_H__
+#define __OPTS_H__
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -87,9 +89,9 @@ class Opts {
     SingleOpt use_gpu;
     SingleOpt gpu_dev;
     SingleOpt work_items;
-    SingleOpt max_primes;
     SingleOpt queue_size;
     SingleOpt platform;
+    SingleOpt n_tests;
 #endif    
     SingleOpt help;
     SingleOpt license;
@@ -159,14 +161,14 @@ class Opts {
     bool has_work_items()   { return work_items.active; }
     string get_work_items() { return work_items.arg;    }
                                                   
-    bool has_max_primes()   { return max_primes.active; }
-    string get_max_primes() { return max_primes.arg;    }
-                                                  
     bool has_queue_size()   { return queue_size.active; }
     string get_queue_size() { return queue_size.arg;    }
                                                   
     bool has_platform()     { return platform.active;   }
     string get_platform()   { return platform.arg;      }
+
+    bool has_n_tests()      { return n_tests.active;    }
+    string get_n_tests()    { return n_tests.arg;       }
 #endif    
                                                   
     bool has_help()         { return help.active;       }
@@ -176,14 +178,5 @@ class Opts {
     /* get help */                                
     string get_help();                            
 };                                              
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
+
+#endif /* __OPTS_H__ */

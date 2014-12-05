@@ -2,13 +2,13 @@ VERSION   = 0.0.1
 SRC       = ./src
 BIN       = ./bin
 CC        = g++
-DBFLAGS   = -g -D DEBUG 
+DBFLAGS   = -g
 CXXFLAGS  = -Wall -Wextra -c -Winline -Wformat -Wformat-security \
             -pthread --param max-inline-insns-single=1000 -lm \
 						-Wno-write-strings -I/opt/AMDAPP/include -g
 LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson -lboost_system \
-					  -L/opts/AMDAPP/lib -lOpenCL 
-OTFLAGS   = -march=native -O2
+					  -L/opts/AMDAPP/lib -lOpenCL
+OTFLAGS   = -march=native -O3
 
 .PHONY: clean test all install
 
@@ -23,13 +23,24 @@ install: all
 # development
 #CXXFLAGS += $(DBFLAGS) 
 
+# PoWCore debugging
+#CXXFLAGS += -D DEBUG
+
+# GPU-Miner enable fast debugging
+#CXXFLAGS += -D DEBUG_BASIC -D DEBUG_FAST
+
+# GPU-Miner enable slow debugging (more tests)
+#CXXFLAGS += -D DEBUG_BASIC -D DEBUG_FAST -D DEBUG_SLOW
+
+
 # optimization
-#CXXFLAGS  += $(OTFLAGS)
-#LDFLAGS   += $(OTFLAGS)
+CXXFLAGS  += $(OTFLAGS)
+LDFLAGS   += $(OTFLAGS)
 
 # disable GPU support
-CXXFLAGS += -DCPU_ONLY
-LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson -lboost_system \
+#CXXFLAGS += -DCPU_ONLY 
+#LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson \
+#						-lboost_system
 
 ALL_SRC = $(shell find $(SRC) -type f -name '*.cpp')
 ALL_OBJ = $(ALL_SRC:%.cpp=%.o)

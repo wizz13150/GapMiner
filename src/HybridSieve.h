@@ -32,6 +32,7 @@
 #include "PoWCore/src/PoWProcessor.h"
 #include "PoWCore/src/Sieve.h"
 #include "GPUFermat.h"
+#include "Opts.h"
 
 using namespace std;
 
@@ -51,9 +52,9 @@ class HybridSieve : public Sieve {
     HybridSieve(PoWProcessor *pprocessor, 
                 uint64_t n_primes, 
                 uint64_t sievesize,
-                uint64_t max_primes = 30000000,
-                uint64_t work_items = 2048,
-                uint64_t queue_size = 5);
+                uint64_t work_items = 512,
+                uint64_t n_tests    = 8,
+                uint64_t queue_size = 10);
 
     ~HybridSieve();
 
@@ -69,76 +70,307 @@ class HybridSieve : public Sieve {
  
   protected :
 
+    /**
+     * calculate for every prime the first
+     * index in the sieve which is divisible by that prime
+     * (and not divisible by two)
+     */
+    void calc_muls();
+
     /* check if we should stop sieving */
     bool should_stop(uint8_t hash[SHA256_DIGEST_LENGTH]);
 
     /* indicates that the sieve should stop calculating */
     bool running;
 
-    /* max sieve primes */
-    uint64_t max_primes;
-
     /* the number of work items pushed to the gpu at once */
     uint64_t work_items;
 
     /* template array for the Fermat candidates */
     uint64_t *candidates_template;
+    
+    /* one GPU work item (set of prime candidates for a prime gap */
+    class GPUWorkItem {
+      
+      private:
+
+        /* the gap start (this is 0 till it gets set from the prevoius work in the work list*/
+        uint32_t start, end;
+
+        /* the first found end */
+        uint32_t first_end;
+
+        /* the min gap length */
+        uint16_t min_len;
+
+#ifndef DEBUG_BASIC
+        /* the prime candidate offsets */
+        uint32_t *offsets;
+#endif        
+       
+        /* the length of the offsets arrays */
+        int16_t len;
+        
+        /* the current index */
+        int16_t index;
+
+      public:
+
+#ifdef DEBUG_BASIC
+        /* public offsets for better debugging */
+        uint32_t *offsets;
+#endif
+
+        /* the next GPUWorkItem in the list */
+        GPUWorkItem *next;
+
+        /* creat new work item */
+        GPUWorkItem(uint32_t *offsets, uint16_t len, uint16_t min_len, uint32_t start);
+
+        ~GPUWorkItem();
+
+        /* get the next candidate offset */
+        uint32_t pop();
+
+        /* set a number to be prime (i relative to index) 
+         * returns true if this can be skipped */
+#ifndef DEBUG_BASIC
+        void set_prime(int16_t i);
+#else
+        void set_prime(int16_t i, uint32_t prime_base[10]);
+
+        /* returns the prime at a given index offset i */
+        uint32_t get_prime(int32_t i);
+#endif
+
+        /* sets the gapstart of this */
+        void set_start(uint32_t start);
+
+        /* returns wheter this gap can be skipped */
+        bool skip();
+
+        /* returns whether this is a valid gap */
+        bool valid();
+
+        /* tells this that it souzld be skiped anyway */
+        void mark_skipable();
+
+        /* returns the start offset */
+        uint32_t get_start();
+
+        /* returns the end offset */
+        uint32_t get_end();
+
+        /* sets the end of this so that 
+         * it don't sets the start of the next item */
+        void set_end();
+
+        /* returns the number of offsets of this */
+        uint16_t get_len();
+
+        /* returns the number of current offsets of this */
+        uint16_t get_cur_len();
+
+#ifdef DEBUG_BASIC
+        /* simple xor check to validate the items */
+        uint32_t get_xor();
+
+        /* prints this */
+        void print(uint32_t prime_base[10]);
+#endif
+    };
+
+    /* a list of GPUWorkItem  */
+    class GPUWorkList {
+      
+      private :
+
+#ifdef DEBUG_BASIC
+        /* simple xor check to validate the items */
+        uint32_t get_xor();
+
+        /* storage value for the xor check */
+        uint32_t check; 
+#endif        
+        
+        /* number of work items */
+        uint32_t len, cur_len;
+ 
+        /* number of candidates to test at once */
+        uint32_t n_tests;
+ 
+        /* List start and end */
+        GPUWorkItem *start, *end;
+
+        /* the candidates array */
+        uint32_t *candidates;
+
+        /* the prime base of this */
+        uint32_t *prime_base;
+
+        /* the PoWProcessor */
+        PoWProcessor *pprocessor;
+
+        /* the sieve */
+        HybridSieve *sieve;
+ 
+        /* synchronization */
+        pthread_mutex_t access_mutex;
+        pthread_cond_t  notfull_cond;
+        pthread_cond_t  full_cond;
+
+        /* mpz values */
+        mpz_t mpz_hash, mpz_adder;
+    
+        /* header target */
+        uint64_t target;
+
+        /* header nonce */
+        uint32_t nonce;
+
+        /* use extra verbose ? */
+        bool extra_verbose;
+
+      public : 
+
+        /* the number of test made by the gpu */
+        uint64_t *tests, *cur_tests;
+
+#ifdef DEBUG_BASIC
+        /* returns the current prime_base of this */
+        uint32_t *get_prime_base();
+#endif
+
+        /* indecates if this sould continue running */
+        bool running;
+        
+        /* creat a new gpu work list */
+        GPUWorkList(uint32_t len, 
+                    uint32_t n_tests,
+                    PoWProcessor *pprocessor,
+                    HybridSieve *sieve,
+                    uint32_t *prime_base,
+                    uint32_t *candidates,
+                    uint64_t *tests,
+                    uint64_t *cur_tests);
+
+        ~GPUWorkList();
+
+        /* returns the size of this */
+        size_t size();
+
+        /* returns the average length*/
+        uint16_t avg_len();
+
+        /* returns the average length*/
+        uint16_t avg_cur_len();
+
+        /* returns the min length*/
+        uint16_t min_cur_len();
+
+        /* reinits this */
+        void reinit(uint32_t prime_base[10], uint64_t target, uint32_t nonce);
+
+        /* returns the nuber of candidates */
+        uint32_t n_candidates();
+
+        /* add a item to the list */
+        void add(GPUWorkItem *item);
+
+        /* creates the candidate array to process */
+        void create_candidates();
+
+        /* parse the gpu results */
+        void parse_results(uint32_t *results);
+
+        /* submits a given offset */
+        bool submit(uint32_t offset);
+
+        /* clears the list */
+        void clear();
+    };
+
+    /* the GPUWorkList of this */
+    GPUWorkList *gpu_list;
 
     /* one set of work items for the GPU */
-    class GPUWork {
+    class SieveItem {
 
       public :
 
-        /* the prime candidates to test */
-        uint32_t *candidates;
-
-        /* the Fermat results */
-        bool *results;
+        /* the sieve */
+        sieve_t *sieve;
 
         /* candidate size */
-        unsigned size;
+        sieve_t sievesize;
+
+        /* min gap length */
+        sieve_t min_len;
+
+        /* first prime */
+        sieve_t start;
+
+        /* sieve index */
+        sieve_t i;
 
         /* the pow nonce */
         uint32_t nonce;
 
         /* the pow target difficulty */
         uint64_t target;
+
+        /* hash of the previous block */
+        uint8_t hash[SHA256_DIGEST_LENGTH];
+
+        /* the current sieve round */
+        sieve_t sieve_round;
+
+        /* the current pow */
+        PoW *pow;
+
+        /* the current mpz_start */
+        mpz_t mpz_start;
        
-        /* create a new GPUWork */
-        GPUWork(unsigned size) {
+        /* create a new SieveItem */
+        SieveItem(sieve_t *sieve, 
+                  sieve_t sievesize, 
+                  sieve_t sieve_round,
+                  uint8_t hash[SHA256_DIGEST_LENGTH],
+                  mpz_t mpz_start,
+                  PoW *pow);
        
-          this->size = size;
-       
-          candidates = (uint32_t *) malloc(sizeof(uint32_t) * size * 10);
-          results    = (bool *) malloc(sizeof(bool) * size);
-        }
-       
-        /* destroys a GPUWork */
-        ~GPUWork() {
-          free(candidates);
-          free(results);
-        }
+        /* destroys a SieveItem */
+        ~SieveItem();
     };
 
 
     /**
      * a class to store prime chain candidates
      */
-    class GPUQueue {
+    class SieveQueue {
 
       public :
 
-        GPUQueue(unsigned capacity = 5);
-        ~GPUQueue();
+        /* indecates if this sould continue running */
+        bool running;
 
-        /* remove the oldest gpu work */
-        GPUWork *pull();
+        /* pointer to the HybridSieve */
+        HybridSieve *hsieve;
 
-        /* add an new GPUWork */
-        void push(GPUWork *work);
+        /* pps measurment */
+        uint64_t *cur_found_primes;
+        uint64_t *found_primes;
 
-        /* clear this */
-        void clear();
+        /* pointer to the sieve's gpu work list */
+        HybridSieve::GPUWorkList *gpu_list;
+
+
+        SieveQueue(unsigned capacity,
+                   HybridSieve *hsieve, 
+                   GPUWorkList *gpu_list,
+                   uint64_t *cur_found_primes,
+                   uint64_t *found_primes);
+        ~SieveQueue();
 
         /* get the size of this */
         size_t size();
@@ -146,49 +378,33 @@ class HybridSieve : public Sieve {
         /* indicates that this queue is full */
         bool full();
 
+        /* remove the oldest gpu work */
+        SieveItem *pull();
+
+        /* add an new SieveItem */
+        void push(SieveItem *work);
+
+        /* clear this */
+        void clear();
+
+        unsigned get_capacity() { return capacity; }
+
       private :
 
         /* the capacity of this */
         unsigned capacity;
 
-        /* the GPUWork queue */
-        queue<GPUWork *> q;
+        /* the SieveItem queue */
+        queue<SieveItem *> q;
 
         /* synchronization */
         pthread_mutex_t access_mutex;
-        pthread_cond_t  empty_cond;
+        pthread_cond_t  notfull_cond;
         pthread_cond_t  full_cond;
     };
 
     /* work input for the gpu */
-    GPUQueue *input;
-
-    /* gpu output queue */
-    GPUQueue *output;
-
-    /* thread args for the calculation threads */
-    typedef struct {
-      GPUQueue *input;
-      GPUQueue *output;
-      bool running;
-      uint64_t *found_primes;
-      uint64_t *gaps10;
-      uint64_t *gaps15;
-      uint64_t *passed_time;
-      uint64_t *cur_found_primes;
-      uint64_t *cur_gaps10;
-      uint64_t *cur_gaps15;
-      uint64_t *cur_passed_time;
-      bool *reset_stats;
-      sieve_t sievesize;
-      PoWUtils *utils;
-      uint64_t work_items;
-      PoWProcessor *pprocessor;
-      HybridSieve *sieve;
-    } ThreadArgs;
-
-    /* thread args of this */
-    ThreadArgs targs;
+    SieveQueue *sieve_queue;
 
     /* the gpu thread */
     static void *gpu_work_thread(void *args);

@@ -161,6 +161,37 @@ __kernel void multiplyBenchmark352(__global uint32_t *m1,
 #undef OperandSize
 }
 
+__kernel void fermatTest320(__global uint32_t *restrict numbers,
+                            __global uint32_t *restrict out,
+                            __global uint32_t *restrict prime_base,
+                            unsigned elementsNum)
+{
+#define OperandSize 10  
+  unsigned globalSize = get_global_size(0);
+
+  uint4 lNumbersv[3] = {
+    (uint4){prime_base[0], prime_base[1], prime_base[2], prime_base[3]}, 
+    (uint4){prime_base[4], prime_base[5], prime_base[6], prime_base[7]}, 
+    (uint4){prime_base[8], prime_base[9], 0, 0}
+  };    
+
+  const uint4 one  = {1,0,0,0};
+  const uint4 zero = {0,0,0,0};
+
+#pragma unroll
+  for (unsigned i = get_global_id(0); i < elementsNum; i += globalSize) {
+
+    uint4 result[3];
+    lNumbersv[0].x = numbers[i];
+    
+    FermatTest320(lNumbersv, result);
+
+    out[i] = 1;
+    if (all(result[0] != one) || all(result[1] != zero) || all(result[2] != zero))
+      out[i] = 0;
+  }
+#undef OperandSize
+}
 
 __kernel void fermatTestBenchMark320(__global uint32_t *restrict numbers,
                                      __global uint32_t *restrict out,

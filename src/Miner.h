@@ -51,29 +51,19 @@ class Miner {
     double avg_primes_per_sec();
 
     /**
-     * returns the average 10 gaps per hour
-     */
-    double avg_gaps10_per_hour();
-
-    /**
-     * returns the average 15 gaps per hour
-     */
-    double avg_gaps15_per_hour();
-
-    /**
      * returns the primes per seconds
      */
     double primes_per_sec();
 
     /**
-     * returns the 10 gaps per hour
+     * returs the prime tests per second
      */
-    double gaps10_per_hour();
+    double tests_per_second();
 
     /**
-     * returns the 15 gaps per hour
+     * returs average the prime tests per second
      */
-    double gaps15_per_hour();
+    double avg_tests_per_second();
 
     /**
      * returns whether this is running

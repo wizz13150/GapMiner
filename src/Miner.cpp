@@ -70,8 +70,8 @@ void Miner::start(BlockHeader *header) {
   Opts *opts = Opts::get_instance();
   bool use_gpu = opts->has_use_gpu(); 
 
-  uint64_t max_primes = (opts->has_max_primes() ? atoi(opts->get_max_primes().c_str()) : 30000000);
-  uint64_t work_items = (opts->has_work_items() ? atoi(opts->get_work_items().c_str()) : 2048);
+  uint64_t n_tests    = (opts->has_n_tests() ? atoi(opts->get_n_tests().c_str()) : 8);
+  uint64_t work_items = (opts->has_work_items() ? atoi(opts->get_work_items().c_str()) : 512);
   uint64_t queue_size = (opts->has_queue_size() ? atoi(opts->get_queue_size().c_str()) : 10);
 #endif
 
@@ -90,8 +90,8 @@ void Miner::start(BlockHeader *header) {
       args[i]->hsieve = new HybridSieve((PoWProcessor *) share_processor, 
                                         sieve_primes, 
                                         sieve_size,
-                                        max_primes,
                                         work_items,
+                                        n_tests,
                                         queue_size);
 
       memcpy(args[i]->hsieve->hash_prev_block, 
@@ -296,45 +296,6 @@ double Miner::avg_primes_per_sec() {
   return apps;
 }
 
-
-/**
- * returns the average 10 gaps per hour
- */
-double Miner::avg_gaps10_per_hour() {
-  
-  if (!is_started) return 0;
-  
-  double ag10 = 0;
-  for (int i = 0; i < n_threads; i++)
-#ifndef CPU_ONLY
-    if (use_gpu)
-      ag10 += args[i]->hsieve->avg_gaps10_per_hour();
-    else
-#endif    
-      ag10 += args[i]->sieve->avg_gaps10_per_hour();
-
-  return ag10;
-}
-
-/**
- * returns the average 15 gaps per hour
- */
-double Miner::avg_gaps15_per_hour() {
-  
-  if (!is_started) return 0;
-  
-  double ag15 = 0;
-  for (int i = 0; i < n_threads; i++)
-#ifndef CPU_ONLY
-    if (use_gpu)
-      ag15 += args[i]->hsieve->avg_gaps15_per_hour();
-    else
-#endif
-      ag15 += args[i]->sieve->avg_gaps15_per_hour();
-
-  return ag15;
-}
-
 /**
  * returns the primes per seconds
  */
@@ -354,43 +315,42 @@ double Miner::primes_per_sec() {
   return pps;
 }
 
-
 /**
- * returns the 10 gaps per hour
+ * returns the average primes per seconds
  */
-double Miner::gaps10_per_hour() {
+double Miner::avg_tests_per_second() {
   
   if (!is_started) return 0;
   
-  double g10 = 0;
+  double avg_tests = 0;
   for (int i = 0; i < n_threads; i++)
 #ifndef CPU_ONLY
     if (use_gpu)
-      g10 += args[i]->hsieve->gaps10_per_hour();
+      avg_tests += args[i]->hsieve->avg_tests_per_second();
     else
-#endif    
-      g10 += args[i]->sieve->gaps10_per_hour();
+#endif
+      avg_tests += args[i]->sieve->avg_tests_per_second();
 
-  return g10;
+  return avg_tests;
 }
 
 /**
- * returns the 15 gaps per hour
+ * returns the primes per seconds
  */
-double Miner::gaps15_per_hour() {
+double Miner::tests_per_second() {
   
   if (!is_started) return 0;
   
-  double g15 = 0;
+  double tests = 0;
   for (int i = 0; i < n_threads; i++)
 #ifndef CPU_ONLY
     if (use_gpu)
-      g15 += args[i]->hsieve->gaps15_per_hour();
+      tests += args[i]->hsieve->tests_per_second();
     else
 #endif    
-      g15 += args[i]->sieve->gaps15_per_hour();
+      tests += args[i]->sieve->tests_per_second();
 
-  return g15;
+  return tests;
 }
 
 /**
