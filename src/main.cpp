@@ -252,8 +252,8 @@ int main(int argc, char *argv[]) {
   /* default 5 sec timeout */
   int timeout = (opts->has_timeout() ? atoi(opts->get_timeout().c_str()) : 5);
 
-  /* default shift 20 */
-  uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 20);
+  /* default shift 25 */
+  uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 25);
 
   /* 10 seconds default */
   unsigned int sec = (opts->has_stats() ? atoll(opts->get_stats().c_str()) : 10);
@@ -274,11 +274,11 @@ int main(int argc, char *argv[]) {
 
   uint64_t sieve_size = (opts->has_sievesize() ? 
                          atoll(opts->get_sievesize().c_str()) :
-                         1048576); 
+                         33554432); 
 
   uint64_t primes     = (opts->has_primes() ? 
                          atoll(opts->get_primes().c_str()) :
-                         500000);
+                         900000);
 
 #ifndef CPU_ONLY
   if (opts->has_use_gpu()) {
