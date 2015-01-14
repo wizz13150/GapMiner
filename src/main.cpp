@@ -327,6 +327,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  Stratum::stop();
+
   if (!opts->has_stratum())
     pthread_join(thread, NULL);
 

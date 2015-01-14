@@ -20,24 +20,39 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <iostream>
-#include <boost/asio.hpp>
 #include <jansson.h>
+#include <cerrno>
+#include <cstring>
+
+#ifndef WINDOWS
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#else
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+
 #include "Stratum.h"
 #include "verbose.h"
 
 #include "Opts.h"
 
-using boost::asio::ip::tcp;
 using namespace std;
 
+/**
+ * seconds to wait until trying to reconnect
+ */
+#define RECONNECT_TIME 15
 
 /* synchronization mutexes */
 pthread_mutex_t Stratum::creation_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t Stratum::connect_mutex  = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t Stratum::send_mutex     = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t Stratum::shares_mutex   = PTHREAD_MUTEX_INITIALIZER;
 
 /* the socket of this */
-tcp::socket *Stratum::socket = NULL;
+int Stratum::tcp_socket = 0;
 
 /* the server address */
 string *Stratum::host = NULL;
@@ -56,6 +71,106 @@ uint16_t Stratum::shift = 0;
 
 /* the only instance of this */
 Stratum *Stratum::only_instance;
+
+/* indicates that this is running */
+bool Stratum::running = true;
+
+/**
+ * returns the possition of the first new line character in the given string
+ */
+static inline ssize_t new_line_pos(char *str, size_t len) {
+  
+  size_t i;
+  for (i = 0; i < len && str[i] != '\n'; i++);
+
+  return i;
+}
+
+/**
+ * reallocs new space if needed
+ */
+static inline ssize_t check_memory(char **buffer, ssize_t *capacity, ssize_t wanted) {
+
+  if (*capacity < 1024) {
+    *capacity = 1024;
+    char *ptr = (char *) realloc(*buffer, *capacity);
+
+    if (ptr == NULL)
+      return -1;
+
+    *buffer = ptr;
+  }
+  
+  while (*capacity < wanted) {
+    *capacity *= 2;
+    
+    char *ptr = (char *) realloc(*buffer, *capacity);
+
+    if (ptr == NULL)
+      return -1;
+
+   *buffer = ptr;
+  }
+
+  return 0;
+}
+
+/**
+ * recives on line form a given socket file descriptor
+ * Note: it reallocs space if needed
+ * NOTE: *buffer has to be an dynamic allocated address
+ */
+ssize_t recv_line(int sock_fd, char **buffer, ssize_t *capacity, int flags) {
+  
+  static char recv_buff[1024];
+  static ssize_t recved_size = 0;
+
+  ssize_t size = 0, size_one = 0;
+
+  for (;;) {
+    
+    /* malloc new space if needed */
+    if (check_memory(buffer, capacity, size + 1023) == -1)
+      return -1;
+
+    /* recev on portion form sender or use old recvied portion */
+    if (recved_size > 0) {
+      
+      memmove(*buffer, recv_buff, recved_size);
+      size_one = recved_size;
+      recved_size = 0;
+    } else
+      size_one = recv(sock_fd, (*buffer) + size, 1023, flags);
+
+    /* check for errors */
+    if (size_one == -1) return -1;
+
+    /* search fo an new line char */
+    ssize_t new_line_char = new_line_pos((*buffer) + size, size_one);
+
+    /* adjust size */
+    new_line_char += size;
+    size += size_one;
+
+    /* we found a new line char */
+    if (size > new_line_char) {
+      
+      /* part of the next line */
+      recved_size = size - (new_line_char + 1);
+
+      /* save part of the next line for futer calls */
+      if (recved_size > 0)
+        memmove(recv_buff, (*buffer) + new_line_char + 1, recved_size);
+
+      (*buffer)[new_line_char] = 0x0;
+
+      size = new_line_char;
+      break;
+    }
+  } 
+
+  return size;
+}
 
 /* access or create the only instance of this */
 Stratum *Stratum::get_instance(string *host, 
@@ -80,9 +195,20 @@ Stratum *Stratum::get_instance(string *host,
     Stratum::port = port;
     Stratum::user = user;
     Stratum::password = password;
-    Stratum::shift = shift;
- 
-    init(host, port);
+    Stratum::shift    = shift;
+
+#ifdef WINDOWS
+    WSADATA data;
+    int res = WSAStartup(MAKEWORD(2,2), &data);
+    if (res != 0) {
+      pthread_mutex_lock(&io_mutex);
+      cout << get_time() << "Failed to initialize winsocket" << endl;
+      pthread_mutex_unlock(&io_mutex);
+    }
+#endif
+
+    
+    reconnect();
 
     only_instance = new Stratum(miner);
   }
@@ -92,81 +218,121 @@ Stratum *Stratum::get_instance(string *host,
   return only_instance;
 }
 
-/* initiates the connection to the given host and port */
-void Stratum::init(string *host, string *port) {
-
-  bool error;
-  do {
-    error = false;
-    
-    try {
-      boost::asio::io_service io_service;
-  
-      tcp::resolver resolver(io_service);
-      tcp::resolver::query query(tcp::v4(), *host, *port);
-  
-      socket = new tcp::socket(io_service);
-      if (socket != NULL) {
-        socket->open(boost::asio::ip::tcp::v4());
-        boost::asio::socket_base::keep_alive option(true);
-        socket->set_option(option);
-
-        boost::asio::connect(*socket, resolver.resolve(query));
-      } else {
-        pthread_mutex_lock(&io_mutex);
-        cout << get_time() << "Connection failed: could not create socket";
-        cout << endl;
-        pthread_mutex_unlock(&io_mutex);
-
-        sleep(5);
-        error = true;
-      }
-    } catch (exception &e) {
-  
-      pthread_mutex_lock(&io_mutex);
-      cout << get_time() << "Connection failed: " << e.what() << endl;
-      pthread_mutex_unlock(&io_mutex);
-      
-      try {
-        if (socket != NULL && socket->is_open())
-          socket->close();
-
-        if (socket != NULL)
-          delete socket;
-
-        socket = NULL;
-      } catch (exception &e) {
-        pthread_mutex_lock(&io_mutex);
-        cout << get_time() << "Closing socket for reconnection failed: ";
-        cout << e.what() << endl;
-        pthread_mutex_unlock(&io_mutex);
-      }
-
-      sleep(5);
-      error = true;
-    }
-  } while (error);
-}
-
-/* reinitialize the connection to the server */
+/**
+ * (re)start an keep alive tcp connection
+ */
 void Stratum::reinit() {
 
-  try {
-    if (socket != NULL && socket->is_open()) 
-      socket->close();
+  int ret = -1;
 
-    if (socket != NULL)
-      delete socket;
+  do {
+    if (running && tcp_socket > 0) {
+      close(tcp_socket);
+      tcp_socket = -1;
+    }
 
-    socket = NULL;
-  } catch (exception &e) {
-    pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "Closing socket for reconnection failed: ";
-    cout << e.what() << endl;
-    pthread_mutex_unlock(&io_mutex);
+    if (running) {
+      
+      tcp_socket = socket(AF_INET, SOCK_STREAM, 0); 
+      
+      /* socket successfully created ? */
+      if (running && tcp_socket >= 0) {
+      
+        /* set keep alive option */
+        int optval = 1;
+        ret = setsockopt(tcp_socket,                                                 
+                         SOL_SOCKET,                                                 
+                         SO_KEEPALIVE,                                               
+                         (const char *) &optval,                                                    
+                         sizeof(int));
+      } 
+      
+      /* recreate on error */
+      if (running && (tcp_socket < 0 || ret < 0)) {
+      
+        pthread_mutex_lock(&io_mutex);
+        cout << get_time() << "failed to create tcp socket: ";
+        cout << strerror(ret) << endl;
+        cout << "retrying after " << RECONNECT_TIME << " seconds..." << endl;
+        pthread_mutex_unlock(&io_mutex);
+        sleep(RECONNECT_TIME);
+      }
+    }
+  } while (running && (tcp_socket < 0 || ret < 0));
+}
+
+/**
+ * (re)connect to a given addr
+ */
+bool Stratum::connect_to_addr(struct addrinfo *addr) {
+
+  bool ret = false;
+
+  if (running) {
+    
+    int cret = -1;
+
+    /* (re)create socket */
+    reinit();
+    
+    if (running) {
+      
+      cret = connect(tcp_socket, addr->ai_addr, addr->ai_addrlen);
+      
+      /* wait and retry on failure */
+      if (!cret)
+        ret = true;
+    }
   }
 
-  init(host, port);
+  return ret;
+}
+
+/**
+ * (re)connect to a given pool
+ */
+void Stratum::reconnect() {
+
+  /* only one thread are allowed to (re)connect */
+  pthread_mutex_lock(&connect_mutex);
+
+  struct addrinfo hints;
+  struct addrinfo *result, *rp;
+
+  do {
+
+    /* (re)create socket */
+    reinit();
+
+    if (running) {
+      memset(&hints, 0, sizeof(struct addrinfo));
+      hints.ai_family = AF_INET;
+      hints.ai_socktype = SOCK_STREAM;
+     
+      int ret = getaddrinfo(host->c_str(), port->c_str(), &hints, &result);
+     
+      if (ret != 0) {
+        pthread_mutex_lock(&io_mutex);
+        cout << get_time() << "failed to optian pool ip: " << strerror(ret) << endl;
+        pthread_mutex_unlock(&io_mutex);
+      }
+     
+      for (rp = result; rp != NULL; rp = rp->ai_next)
+        if (connect_to_addr(rp))
+          break;
+     
+      if (rp == NULL) {               /* No address succeeded */
+        pthread_mutex_lock(&io_mutex);
+        cout << get_time() << "failed to connect to pool" << endl;
+        cout << "retrying after " << RECONNECT_TIME << " seconds..." << endl;
+        pthread_mutex_unlock(&io_mutex);
+        sleep(RECONNECT_TIME);
+      }
+    }
+  } while (running && rp == NULL);
+  
+
+  pthread_mutex_unlock(&connect_mutex);
 }
 
 /* creates a new Stratum instance */
@@ -228,8 +394,9 @@ void *Stratum::recv_thread(void *arg) {
   ThreadArgs *targs = (ThreadArgs *) arg;
   Miner *miner = targs->miner;
   map<int, double> *shares = targs->shares;
+  ssize_t buf_len = 1024;
+  char *buffer = (char *) malloc(sizeof(char) * buf_len);
 
-  boost::asio::streambuf buffer;
 
   if (Opts::get_instance()->has_extra_vb()) {
     pthread_mutex_lock(&io_mutex);
@@ -240,29 +407,22 @@ void *Stratum::recv_thread(void *arg) {
   while (targs->running) {
     
     /* receive message from server */
-    try {
-      boost::asio::read_until(*socket, buffer, '\n');
-    } catch (exception &e) {
+    if (recv_line(tcp_socket, &buffer, &buf_len, 0) < 0) {
 
       pthread_mutex_lock(&io_mutex);
-      cout << get_time() << "Error receiving message form server: ";
-      cout << e.what() << endl;
+      cout << get_time() << "Error receiving message form server: " << endl;
       pthread_mutex_unlock(&io_mutex);
 
       /* reset connection */
-      reinit();
+      reconnect();
       get_instance()->getwork();
     }
 
-    json_t *root;
+    json_t *root, *real_root;
     json_error_t error;
  
-    /* parse message */
-    istream is(&buffer);
-    string msg;
-    getline(is, msg);
-
-    root = json_loads(msg.c_str(), 0, &error);
+    root = json_loads(buffer, 0, &error);
+    real_root = root;
  
     if(!root) {
       pthread_mutex_lock(&io_mutex);
@@ -276,7 +436,7 @@ void *Stratum::recv_thread(void *arg) {
       pthread_mutex_lock(&io_mutex);
       cout << get_time() << "can not parse server response" << endl;
       pthread_mutex_unlock(&io_mutex);
-      json_decref(root);
+      json_decref(real_root);
       continue;
     }
     json_t *j_id = json_object_get(root, "id");
@@ -305,7 +465,7 @@ void *Stratum::recv_thread(void *arg) {
         cout << get_time() << "can not parse server response" << endl;
         pthread_mutex_unlock(&io_mutex);
       }
-      json_decref(root);
+      json_decref(real_root);
 
     /* block notify message */
     } else {
@@ -319,7 +479,7 @@ void *Stratum::recv_thread(void *arg) {
         cout << get_time() << "can not parse server response" << endl;
         pthread_mutex_unlock(&io_mutex);
       }
-      json_decref(root);
+      json_decref(real_root);
     }
   }
 
@@ -419,27 +579,23 @@ bool Stratum::sendwork(BlockHeader *header) {
   ss << "\", \"" << header->get_hex()  << "\" ] }\n";
 
   bool error;
+  string share = ss.str();
   do {
     error = false;
 
-    try {
-      pthread_mutex_lock(&send_mutex);
-      socket->send(boost::asio::buffer((ss.str()))); 
-      pthread_mutex_unlock(&send_mutex);
-
-    } catch (exception &e) {
-
+    /* send the share to the pool */
+    size_t ret = send(tcp_socket, share.c_str(), share.length(), 0);
+ 
+    if (ret != share.length()) {
+ 
       pthread_mutex_lock(&io_mutex);
-      cout << get_time() << "Submitting share failed" << e.what() << endl;
+      cout << get_time() << "Submitting share failed" << endl;
       pthread_mutex_unlock(&io_mutex);
       error = true;
+      reconnect();
     }
 
-    /* force reconnect */
-    if (error) {
-      reinit();
-    }
-  } while (error);
+  } while (running && error);
 
   pthread_mutex_lock(&shares_mutex);
   shares[n_msgs] = ((double) header->difficulty) / TWO_POW48;
@@ -467,31 +623,33 @@ BlockHeader *Stratum::getwork() {
   /* not optimal password should be hashed */
   ss << "[ \"" << *user << "\", \"" << *password  << "\" ] }\n";
 
+  string request = ss.str();
+
   bool error;
   do {
     error = false;
 
-    try {
-      pthread_mutex_lock(&send_mutex);
-      socket->send(boost::asio::buffer((ss.str()))); 
-      pthread_mutex_unlock(&send_mutex);
-
-    } catch (exception &e) {
-
+    size_t ret = send(tcp_socket, request.c_str(), request.length(), 0);
+ 
+    if (ret != request.length()) {
+ 
       pthread_mutex_lock(&io_mutex);
-      cout << get_time() << "Requesting work failed" << e.what() << endl;
+      cout << get_time() << "Requesting work failed" << endl;
       pthread_mutex_unlock(&io_mutex);
       error = true;
+      reconnect();
     }
 
-    /* force reconnect */
-    if (error) {
-      reinit();
-    }
-  } while (error);
+  } while (running && error);
 
   pthread_mutex_lock(&shares_mutex);
   n_msgs++;
   pthread_mutex_unlock(&shares_mutex);
   return NULL;
+}
+
+void Stratum::stop() {
+
+  Stratum::running = false;
+  close(tcp_socket);
 }

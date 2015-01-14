@@ -56,13 +56,12 @@
  *        a getwork request.
  */
 #include <iostream>
-#include <boost/asio.hpp>
 #include <pthread.h>
 #include <jansson.h>
+#include <map>
 #include "Miner.h"
 #include "BlockHeader.h"
 
-using boost::asio::ip::tcp;
 using namespace std;
 
 class Stratum {
@@ -77,11 +76,6 @@ class Stratum {
                                  uint16_t shift = 0,
                                  Miner *miner = NULL);
 
-    /* initiates the connection to the given host and port */
-    static void init(string *host, string *port);
-
-    /* reinitialize the connection to the server */
-    static void reinit();
 
     /* stop this */
     static void stop();
@@ -162,6 +156,7 @@ class Stratum {
 
     /* synchronization mutexes */
     static pthread_mutex_t creation_mutex;
+    static pthread_mutex_t connect_mutex;
     static pthread_mutex_t send_mutex;
     static pthread_mutex_t shares_mutex;
 
@@ -174,9 +169,23 @@ class Stratum {
      */
     static void parse_block_work(Miner *miner, json_t *result);
 
+    /**
+     * (re)start an keep alive tcp connection
+     */
+    static void reinit();
+
+    /**
+     * (re)connect to a given addr
+     */
+    static bool connect_to_addr(struct addrinfo *addr);
+
+    /**
+     * (re)connect to a given pool
+     */
+    static void reconnect();
 
     /* the socket of this */
-    static tcp::socket *socket;
+    static int tcp_socket;
 
     /* the server address */
     static string *host;
@@ -207,4 +216,7 @@ class Stratum {
 
     /* message counter */
     int n_msgs;
+
+    /* indicates that this is running */
+    static bool running;
 };
