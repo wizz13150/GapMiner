@@ -6,7 +6,7 @@ DBFLAGS   = -g
 CXXFLAGS  = -Wall -Wextra -c -Winline -Wformat -Wformat-security \
             -pthread --param max-inline-insns-single=1000 -lm \
 						-Wno-write-strings -I/opt/AMDAPP/include -g
-LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson -lboost_system \
+LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson \
 					  -L/opts/AMDAPP/lib -lOpenCL
 OTFLAGS   = -march=native -O3
 
@@ -38,9 +38,8 @@ CXXFLAGS  += $(OTFLAGS)
 LDFLAGS   += $(OTFLAGS)
 
 # disable GPU support
-#CXXFLAGS += -DCPU_ONLY 
-#LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson \
-#						-lboost_system
+CXXFLAGS += -DCPU_ONLY 
+LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson
 
 ALL_SRC = $(shell find $(SRC) -type f -name '*.cpp')
 ALL_OBJ = $(ALL_SRC:%.cpp=%.o)
