@@ -598,7 +598,7 @@ bool Stratum::sendwork(BlockHeader *header) {
   } while (running && error);
 
   pthread_mutex_lock(&shares_mutex);
-  shares[n_msgs] = ((double) header->difficulty) / TWO_POW48;
+  shares[n_msgs] = ((double) header->get_pow().difficulty()) / TWO_POW48;
   n_msgs++;
   pthread_mutex_unlock(&shares_mutex);
 
