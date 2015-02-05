@@ -58,8 +58,8 @@ ShareProcessor *ShareProcessor::get_processor() {
 
   pthread_mutex_lock(&creation_mutex);
   if (!initialized) {
-    only_instance = new ShareProcessor();
     initialized   = true;
+    only_instance = new ShareProcessor();
   }
   pthread_mutex_unlock(&creation_mutex);
 
