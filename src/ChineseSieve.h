@@ -17,7 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <gmp.h>
-#include "SieveUtils.h"
 #include "ChineseSet.h"
 #include "GapCandidate.h"
 #include "PoWCore/src/PoW.h"

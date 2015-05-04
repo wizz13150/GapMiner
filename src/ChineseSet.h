@@ -19,7 +19,8 @@
 #ifndef __CHINESE_SET_H__
 #define __CHINESE_SET_H__
 #include <gmp.h>
-#include "SieveUtils.h"
+#include "PoWCore/src/PoWUtils.h"
+#include "PoWCore/src/Sieve.h"
 
 class ChineseSet {
 

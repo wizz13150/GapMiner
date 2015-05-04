@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "SieveUtils.h"
+#include "PoWCore/src/PoWUtils.h"
 #include "ChineseSieve.h"
 #include <iostream>
 #include <iomanip>
@@ -37,6 +37,27 @@ static bool compare_gap_candidate(GapCandidate *a, GapCandidate *b) {
   return a->n_candidates >= b->n_candidates;
 }
 
+/**
+ * calculates the log from a mpz value
+ * (double version for debugging)
+ */
+static double mpz_log(mpz_t mpz) {
+  
+  mpfr_t mpfr_tmp;
+  mpfr_init_set_z(mpfr_tmp, mpz, MPFR_RNDD);
+  mpfr_log(mpfr_tmp, mpfr_tmp, MPFR_RNDD);
+  
+  double res = mpfr_get_d(mpfr_tmp, MPFR_RNDD);
+  mpfr_clear(mpfr_tmp);
+ 
+  return res;
+}
+
+#if __WORDSIZE == 64
+#define popcount(X) __builtin_popcountl(X)
+#else
+#define popcount(X) __builtin_popcountll(X)
+#endif
 
 /* stores the found gaps in the form n * primorial, n_candidates */
 vector<GapCandidate *> ChineseSieve::gaps = vector<GapCandidate *>();
@@ -242,7 +263,7 @@ void ChineseSieve::run_sieve(PoW *pow, uint8_t hash[SHA256_DIGEST_LENGTH]) {
   log_str("run_sieve with " + itoa(pow->get_target()) + " target and " +
       itoa(pow->get_shift()) + " shift", LOG_D);
 
-  uint64_t time = SieveUtils::gettime_usec();
+  uint64_t time = PoWUtils::gettime_usec();
   this->running = true;
   if (cset->bit_size >= pow->get_shift()) {
     cout << "shift to less expected at least " << cset->bit_size << endl;
@@ -288,7 +309,7 @@ void ChineseSieve::run_sieve(PoW *pow, uint8_t hash[SHA256_DIGEST_LENGTH]) {
 
   sieve_t sievesize = bound(pow->target_size(mpz_start), 8);
   sievesize = (sievesize > cset->byte_size * 8) ? cset->size : sievesize;
-  log_str("init time: " + itoa(SieveUtils::gettime_usec() - time) + "us", LOG_D);
+  log_str("init time: " + itoa(PoWUtils::gettime_usec() - time) + "us", LOG_D);
   log_str("sievesize: " + itoa(sievesize), LOG_D);
 
 
@@ -346,7 +367,7 @@ void ChineseSieve::run_fermat() {
   sieve_t speed_factor = 0;
 
   for (;;) {
-    uint64_t time = SieveUtils::gettime_usec();
+    uint64_t time = PoWUtils::gettime_usec();
 
     /* get the next best GapCandidate */
     pthread_mutex_lock(&mutex);
@@ -407,7 +428,7 @@ void ChineseSieve::run_fermat() {
 
 
     if (log_start < 1) 
-      log_start = SieveUtils::mpz_log(gap->mpz_gap_start);
+      log_start = mpz_log(gap->mpz_gap_start);
       
     speed_factor = get_speed_factor(cur_merit, gap->n_candidates);
 
@@ -416,7 +437,7 @@ void ChineseSieve::run_fermat() {
     found_primes += sievesize * speed_factor / log_start;
 
     n_gaps += cur_n_gaps;
-    uint64_t cur_time = SieveUtils::gettime_usec() - time;
+    uint64_t cur_time = PoWUtils::gettime_usec() - time;
     passed_time      += cur_time;
     cur_passed_time   = (cur_passed_time + 3 * cur_time) / 4;
 
