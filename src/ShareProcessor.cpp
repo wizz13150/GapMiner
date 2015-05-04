@@ -56,6 +56,7 @@ ShareProcessor *ShareProcessor::only_instance = NULL;
 /* return the only instance of this */
 ShareProcessor *ShareProcessor::get_processor() {
 
+  log_str("returning only instance", LOG_D);
   pthread_mutex_lock(&creation_mutex);
   if (!initialized) {
     initialized   = true;
@@ -68,6 +69,8 @@ ShareProcessor *ShareProcessor::get_processor() {
 
 /* run clean up */
 void ShareProcessor::cleanup() {
+
+  log_str("cleanup", LOG_D);
   pthread_mutex_lock(&creation_mutex);
   if (initialized) {
     initialized = false;
@@ -81,6 +84,10 @@ void ShareProcessor::cleanup() {
  * Processes a given PoW
  */
 bool ShareProcessor::process(PoW *pow) {
+  
+  log_str("processing pow with target: " + itoa(pow->get_target()) +
+      " and nonce: " + itoa(pow->get_nonce()) + 
+      " and difficulty: " + itoa(pow->difficulty()), LOG_D);
 
   /* stop sieve if we mine stales */
   bool stop_sieveing = true;
@@ -103,7 +110,8 @@ bool ShareProcessor::process(PoW *pow) {
       pthread_mutex_unlock(&queue_mutex);
       
       stop_sieveing = false;
-    }
+    } else
+      log_str("got stale pow", LOG_W);
   }
 
   return stop_sieveing;
@@ -111,6 +119,7 @@ bool ShareProcessor::process(PoW *pow) {
 
 /* updates the current block header */
 void ShareProcessor::update_header(BlockHeader *header) {
+  log_str("updating BlockHeader", LOG_D);
   pthread_mutex_lock(&queue_mutex);
   
   /* discard now obsolete shares */
@@ -130,6 +139,7 @@ void ShareProcessor::update_header(BlockHeader *header) {
 
 /* private constructor to allow only one instance */
 ShareProcessor::ShareProcessor() {
+  log_str("creating", LOG_D);
   this->header = NULL;
 
   /* lock the shares thread */
@@ -140,6 +150,7 @@ ShareProcessor::ShareProcessor() {
 
 /* private destructor */
 ShareProcessor::~ShareProcessor() {
+  log_str("deleting", LOG_D);
   pthread_mutex_lock(&queue_mutex);
 
   /* clear shares */
@@ -160,6 +171,7 @@ ShareProcessor::~ShareProcessor() {
 /* thread which processes the share queue */
 void *ShareProcessor::share_processor(void *args) {
 
+  log_str("share_processor thread started", LOG_D);
   queue<BlockHeader *> *shares = (queue<BlockHeader *> *) args;
   BlockHeader *cur;
   Rpc *rpc = NULL;
@@ -198,7 +210,11 @@ void *ShareProcessor::share_processor(void *args) {
     } else {
 
       /* submit share */
+      log_str("Submitting Share: " + itoa(cur->get_pow().difficulty()), LOG_D);
       bool accepted = rpc->sendwork(cur);
+
+      log_str("Found Share: " + itoa(cur->get_pow().difficulty()) +
+              "  =>  " + (accepted ? "accepted" : "stale!"), LOG_I);
 
       pthread_mutex_lock(&io_mutex);
       cout.precision(7);
@@ -214,6 +230,7 @@ void *ShareProcessor::share_processor(void *args) {
     delete cur;
   }
 
+  log_str("share_processor thread stopped", LOG_D);
   return NULL;
 }
 
@@ -224,6 +241,8 @@ void *ShareProcessor::share_processor(void *args) {
  */
 BlockHeader *ShareProcessor::get_header_from(PoW *share) {
 
+  log_str("getting header for pow with nonce: " + itoa(share->get_nonce()) +
+          " and difficulty: " + itoa(share->difficulty()), LOG_D);
   pthread_mutex_lock(&queue_mutex);
   BlockHeader *cur = header->clone();
   pthread_mutex_unlock(&queue_mutex);
@@ -244,8 +263,10 @@ BlockHeader *ShareProcessor::get_header_from(PoW *share) {
   /* is share for the current hash */
   if (!mpz_cmp(mpz_shash, mpz_hhash))
     ret = cur;
-  else
+  else {
+    log_str("processed stale share", LOG_W);
     delete cur;
+  }
 
   mpz_clear(mpz_shash);
   mpz_clear(mpz_hhash);

@@ -130,6 +130,8 @@ stratum(   "-c", "--stratum",        "use stratum protocol for connection",     
 sievesize( "-s", "--sieve-size",     "the prime sieve size",                          true),
 primes(    "-i", "--sieve-primes",   "number of primes for sieving",                  true),
 shift(     "-f", "--shift",          "the adder shift",                               true),
+cset(      "-r", "--crt",            "use the given Chinese Remainder Theorem file",  true),
+fermat_threads("-d", "--fermat-threads", "number of fermat threads wen using the crt",    true),
 #ifndef CPU_ONLY
 benchmark( "-b", "--benchmark",      "run a gpu benchmark",                           false),
 use_gpu(   "-g", "--use-gpu",        "use the gpu for Fermat testing",                false),
@@ -191,6 +193,14 @@ license(   "-v", "--license",        "show license of this program",            
   shift.active = has_arg(shift.short_opt,  shift.long_opt);
   if (shift.active)
     shift.arg = get_arg(shift.short_opt,  shift.long_opt);
+
+  cset.active = has_arg(cset.short_opt,  cset.long_opt);
+  if (cset.active)
+    cset.arg = get_arg(cset.short_opt,  cset.long_opt);
+
+  fermat_threads.active = has_arg(fermat_threads.short_opt,  fermat_threads.long_opt);
+  if (fermat_threads.active)
+    fermat_threads.arg = get_arg(fermat_threads.short_opt,  fermat_threads.long_opt);
 
 
 #ifndef CPU_ONLY
@@ -289,6 +299,12 @@ string Opts::get_help()  {
 
   ss << "  " << shift.short_opt  << "  " << left << setw(18);
   ss << shift.long_opt << "  " << shift.description << "\n\n";
+
+  ss << "  " << cset.short_opt  << "  " << left << setw(18);
+  ss << cset.long_opt << "  " << cset.description << "\n\n";
+
+  ss << "  " << fermat_threads.short_opt  << "  " << left << setw(18);
+  ss << fermat_threads.long_opt << "  " << fermat_threads.description << "\n\n";
 
 #ifndef CPU_ONLY
   ss << "  " << benchmark.short_opt  << "  " << left << setw(18);

@@ -44,13 +44,18 @@ Miner::Miner(uint64_t sieve_size,
              uint64_t sieve_primes, 
              int n_threads) {
 
-  this->sieve_size   = sieve_size;
-  this->sieve_primes = sieve_primes;
-  this->n_threads    = n_threads;
-  this->running      = false;
-  this->is_started   = false;
+  log_str("creating Miner with " + itoa(n_threads) + " threads", LOG_D);
+  this->sieve_size     = sieve_size;
+  this->sieve_primes   = sieve_primes;
+  this->n_threads      = n_threads;
+  this->running        = false;
+  this->is_started     = false;
+  this->use_chinese    = Opts::get_instance()->has_cset(); 
+  this->fermat_threads = 1;
+  if (Opts::get_instance()->has_fermat_threads())
+    this->fermat_threads = atoi(Opts::get_instance()->get_fermat_threads().c_str());
 #ifndef CPU_ONLY  
-  this->use_gpu      = Opts::get_instance()->has_use_gpu(); 
+  this->use_gpu        = Opts::get_instance()->has_use_gpu(); 
 #endif  
 
   threads      = (pthread_t *)   calloc(n_threads, sizeof(pthread_t));
@@ -65,9 +70,10 @@ Miner::Miner(uint64_t sieve_size,
 /* start processing */
 void Miner::start(BlockHeader *header) {
 
+  log_str("starting Miner", LOG_D);
   running = true;
-#ifndef CPU_ONLY
   Opts *opts = Opts::get_instance();
+#ifndef CPU_ONLY
   bool use_gpu = opts->has_use_gpu(); 
 
   uint64_t n_tests    = (opts->has_n_tests() ? atoi(opts->get_n_tests().c_str()) : 8);
@@ -77,6 +83,12 @@ void Miner::start(BlockHeader *header) {
 
   ShareProcessor *share_processor = ShareProcessor::get_processor();
   share_processor->update_header(header);
+
+  if (use_chinese)
+    memcpy(ChineseSieve::hash_prev_block, 
+           header->hash_prev_block,
+           SHA256_DIGEST_LENGTH);
+
 
   for (int i = 0; i < n_threads; i++) {
 
@@ -100,9 +112,18 @@ void Miner::start(BlockHeader *header) {
              
     } else {
 #endif
-      args[i]->sieve = new Sieve((PoWProcessor *) share_processor, 
-                                 sieve_primes, 
-                                 sieve_size);
+      if (use_chinese) {
+        
+        ChineseSet *cset = new ChineseSet(opts->get_cset().c_str());
+        args[i]->csieve = new ChineseSieve((PoWProcessor *) share_processor, 
+                                           sieve_primes, 
+                                           cset);
+
+      } else {
+        args[i]->sieve = new Sieve((PoWProcessor *) share_processor, 
+                                   sieve_primes, 
+                                   sieve_size);
+      }
 #ifndef CPU_ONLY
     }
 #endif
@@ -121,15 +142,18 @@ void Miner::start(BlockHeader *header) {
 
 /* delete a miner */
 Miner::~Miner() {
+  log_str("deleting Miner", LOG_D);
   stop();
 }
 
 /* stops all threads and waits until they are finished */
 void Miner::stop() {
 
+  log_str("stopping Miner", LOG_D);
 #ifndef CPU_ONLY
   bool use_gpu = Opts::get_instance()->has_use_gpu(); 
 #endif
+  bool use_chinese = Opts::get_instance()->has_cset(); 
 
   if (running) {
     running = false;
@@ -141,15 +165,24 @@ void Miner::stop() {
         args[i]->hsieve->stop();
 #endif
 
+      if (use_chinese)
+        args[i]->csieve->stop();
+
       pthread_join(threads[i], NULL);
       delete args[i]->header;
 
 #ifndef CPU_ONLY
       if (use_gpu)
         delete args[i]->hsieve;
-      else
+      else {
 #endif
-        delete args[i]->sieve;
+        if (use_chinese)
+          delete args[i]->csieve;
+        else
+          delete args[i]->sieve;
+#ifndef CPU_ONLY
+      }
+#endif
     }
   }
 }
@@ -158,10 +191,12 @@ void Miner::stop() {
 bool Miner::update_header(BlockHeader *header) {
   
   if (!is_started) return false;
+  log_str("updating BlockHeader", LOG_D);
 
 #ifndef CPU_ONLY
   bool use_gpu = Opts::get_instance()->has_use_gpu(); 
 #endif
+  bool use_chinese = Opts::get_instance()->has_cset(); 
   
   if (!running)
     return false;
@@ -176,6 +211,14 @@ bool Miner::update_header(BlockHeader *header) {
       args[i]->hsieve->stop();
   }
 #endif
+
+  /* restart sieve  with new header */
+  if (use_chinese) {
+    memcpy(ChineseSieve::hash_prev_block, 
+           header->hash_prev_block,
+           SHA256_DIGEST_LENGTH);
+    ChineseSieve::reset();
+  }
 
   pthread_mutex_lock(&mutex);
   for (int i = 0; i < n_threads; i++) {
@@ -208,7 +251,7 @@ Miner::ThreadArgs::ThreadArgs(int id,
 
 /* a single mining thread */
 void *Miner::miner(void *args) {
-  
+
 #ifndef WINDOWS
   /* use idle CPU cycles for mining */
   struct sched_param param;
@@ -218,25 +261,32 @@ void *Miner::miner(void *args) {
 
   
   ThreadArgs *targs = (ThreadArgs *) args;
+  log_str("Miner thread " + itoa(targs->id) + " started", LOG_D);
 #ifndef CPU_ONLY
   bool use_gpu = Opts::get_instance()->has_use_gpu(); 
 #endif
+  bool use_chinese = Opts::get_instance()->has_cset(); 
+  int fermat_threads = 1;
+  if (Opts::get_instance()->has_fermat_threads())
+    fermat_threads = atoi(Opts::get_instance()->get_fermat_threads().c_str());
+
+  if (use_chinese && targs->id < fermat_threads) {
+    targs->csieve->run_fermat();
+    return NULL;
+  }
+    
 
   mpz_t mpz_hash;
   mpz_init(mpz_hash);
-#ifndef CPU_ONLY
   uint8_t hash_prev_block[SHA256_DIGEST_LENGTH];
-#endif
 
   while (*targs->running) {
     
     pthread_mutex_lock(&mutex);
     targs->header->get_hash(mpz_hash);
-#ifndef CPU_ONLY
     memcpy(hash_prev_block,
            targs->header->hash_prev_block,
            SHA256_DIGEST_LENGTH);
-#endif           
     
     /* hash has to be in range (2^255, 2^256) */
     while (mpz_sizeinbase(mpz_hash, 2) != 256) {
@@ -256,9 +306,15 @@ void *Miner::miner(void *args) {
 #ifndef CPU_ONLY
     if (use_gpu)
       targs->hsieve->run_sieve(&pow, NULL, hash_prev_block);
-    else
+    else {
 #endif
-      targs->sieve->run_sieve(&pow, NULL);
+      if (use_chinese)
+        targs->csieve->run_sieve(&pow, hash_prev_block);
+      else        
+        targs->sieve->run_sieve(&pow, NULL);
+#ifndef CPU_ONLY
+    }
+#endif
 
     pthread_mutex_lock(&mutex);
     targs->header->nonce += targs->n_threads;
@@ -270,10 +326,17 @@ void *Miner::miner(void *args) {
 #ifndef CPU_ONLY
   if (use_gpu)
     delete targs->hsieve;
-  else
+  else {
 #endif
-    delete targs->sieve;
+    if (use_chinese)
+      delete targs->csieve;
+    else
+      delete targs->sieve;
+#ifndef CPU_ONLY
+  }
+#endif
 
+  log_str("Miner thread " + itoa(targs->id) + " stopped", LOG_D);
   return NULL;
 }
 
@@ -289,9 +352,15 @@ double Miner::avg_primes_per_sec() {
 #ifndef CPU_ONLY
     if (use_gpu)
       apps += args[i]->hsieve->avg_primes_per_sec();
-    else
+    else {
 #endif
-      apps += args[i]->sieve->avg_primes_per_sec();
+      if (use_chinese) 
+        apps += args[i]->csieve->avg_primes_per_sec();
+      else 
+        apps  += args[i]->sieve->avg_primes_per_sec();
+#ifndef CPU_ONLY
+    }
+#endif
 
   return apps;
 }
@@ -308,11 +377,67 @@ double Miner::primes_per_sec() {
 #ifndef CPU_ONLY
     if (use_gpu)
       pps += args[i]->hsieve->primes_per_sec();
-    else
+    else {
 #endif    
-      pps += args[i]->sieve->primes_per_sec();
+      if (use_chinese) 
+        pps += args[i]->csieve->primes_per_sec();
+      else 
+        pps += args[i]->sieve->primes_per_sec();
+#ifndef CPU_ONLY
+    }
+#endif
 
   return pps;
+}
+
+/**
+ * returns the average primes per seconds
+ */
+double Miner::avg_gaps_per_second() {
+  
+  if (!is_started) return 0;
+  
+  double avg_gaps = 0;
+  for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
+    if (use_gpu)
+      avg_gaps += args[i]->hsieve->avg_gaps_per_second();
+    else {
+#endif
+      if (use_chinese) 
+        avg_gaps += args[i]->csieve->avg_gaps_per_second();
+      else 
+        avg_gaps += args[i]->sieve->avg_gaps_per_second();
+#ifndef CPU_ONLY
+    }
+#endif
+
+  return avg_gaps;
+}
+
+/**
+ * returns the primes per seconds
+ */
+double Miner::gaps_per_second() {
+  
+  if (!is_started) return 0;
+  
+  double gaps = 0;
+  for (int i = 0; i < n_threads; i++)
+#ifndef CPU_ONLY
+    if (use_gpu)
+      gaps += args[i]->hsieve->gaps_per_second();
+    else {
+#endif    
+      if (use_chinese) 
+        gaps += args[i]->csieve->gaps_per_second();
+      else 
+        gaps  += args[i]->sieve->gaps_per_second();
+#ifndef CPU_ONLY
+    }
+#endif
+
+  return gaps;
 }
 
 /**
@@ -327,9 +452,15 @@ double Miner::avg_tests_per_second() {
 #ifndef CPU_ONLY
     if (use_gpu)
       avg_tests += args[i]->hsieve->avg_tests_per_second();
-    else
+    else {
 #endif
-      avg_tests += args[i]->sieve->avg_tests_per_second();
+      if (use_chinese) 
+        avg_tests += args[i]->csieve->avg_tests_per_second();
+      else 
+        avg_tests += args[i]->sieve->avg_tests_per_second();
+#ifndef CPU_ONLY
+    }
+#endif
 
   return avg_tests;
 }
@@ -346,11 +477,46 @@ double Miner::tests_per_second() {
 #ifndef CPU_ONLY
     if (use_gpu)
       tests += args[i]->hsieve->tests_per_second();
-    else
+    else {
 #endif    
-      tests += args[i]->sieve->tests_per_second();
+      if (use_chinese) 
+        tests += args[i]->csieve->tests_per_second();
+       else 
+        tests += args[i]->sieve->tests_per_second();
+#ifndef CPU_ONLY
+    }
+#endif
 
   return tests;
+}
+
+/**
+ * returns the crt_status
+ */
+double Miner::get_crt_status() {
+  
+  if (!is_started) return 0;
+  
+  double status = 0;
+  for (int i = 0; i < fermat_threads; i++)
+    if (use_chinese) 
+      status += args[i]->csieve->get_crt_status();
+
+  return status / fermat_threads;
+}
+
+
+/**
+ * returns the percent we have already calculated form the current share
+ */
+double Miner::next_share_percent() {
+  
+  if (!is_started) return 0;
+
+  if (use_chinese) 
+    return ChineseSieve::next_share_percent();
+
+  return 0;
 }
 
 /**

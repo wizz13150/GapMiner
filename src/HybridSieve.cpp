@@ -113,6 +113,7 @@ HybridSieve::HybridSieve(PoWProcessor *pprocessor,
                                                       n_primes,
                                                       sievesize) { 
 
+  log_str("creating HybridSieve", LOG_D);
   this->n_primes         = n_primes;
   this->work_items       = work_items;
   this->passed_time      = 1;
@@ -140,6 +141,7 @@ HybridSieve::HybridSieve(PoWProcessor *pprocessor,
 
 HybridSieve::~HybridSieve() { 
   
+  log_str("deleting HybridSieve", LOG_D);
   stop();
   
   gpu_list->running    = false;
@@ -168,6 +170,9 @@ void HybridSieve::run_sieve(PoW *pow,
                             vector<uint8_t> *offset, 
                             uint8_t hash[SHA256_DIGEST_LENGTH]) {
   
+  log_str("run_sieve with " + itoa(pow->get_target()) + " target and " +
+      itoa(pow->get_shift()) + " shift", LOG_D);
+
   if (Opts::get_instance()->has_extra_vb()) {
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "Starting new sieve" << endl;
@@ -353,6 +358,7 @@ bool HybridSieve::SieveQueue::full() {
 /* the gpu thread */
 void *HybridSieve::gpu_work_thread(void *args) {
 
+  log_str("starting gpu_work_thread", LOG_D);
   if (Opts::get_instance()->has_extra_vb()) {
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "GPU work thread started\n";
@@ -464,6 +470,7 @@ void *HybridSieve::gpu_work_thread(void *args) {
 /* the gpu results processing thread */
 void *HybridSieve::gpu_results_thread(void *args) {
 
+  log_str("starting gpu_results_thread", LOG_D);
   if (Opts::get_instance()->has_extra_vb()) {
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "GPU result processing thread started\n";
@@ -521,6 +528,7 @@ void *HybridSieve::gpu_results_thread(void *args) {
 /* stop the current running sieve */
 void HybridSieve::stop() {
   
+  log_str("stopping HybridSieve", LOG_D);
   running = false;
 }
 
@@ -539,7 +547,7 @@ bool HybridSieve::should_stop(uint8_t hash[SHA256_DIGEST_LENGTH]) {
   return result;
 }
 
-/* creat new work item */
+/* create new work item */
 HybridSieve::GPUWorkItem::GPUWorkItem(uint32_t *offsets, uint16_t len, uint16_t min_len, uint32_t start) {
 
   this->offsets = (uint32_t *) malloc(sizeof(uint32_t) * len);
@@ -694,7 +702,7 @@ void HybridSieve::GPUWorkItem::set_start(uint32_t start) {
   this->start = start;
 }
 
-/* returns wheter this gap can be skipped */
+/* returns whether this gap can be skipped */
 bool HybridSieve::GPUWorkItem::skip() {
   return (start != 0 && end != 0 && next != NULL && (end - start < min_len || start > end));
 }
@@ -728,7 +736,7 @@ uint16_t HybridSieve::GPUWorkItem::get_cur_len() {
 }
 
 
-/* creat a new gpu work list */
+/* create a new gpu work list */
 HybridSieve::GPUWorkList::GPUWorkList(uint32_t len, 
                                       uint32_t n_tests,
                                       PoWProcessor *pprocessor,
@@ -738,6 +746,7 @@ HybridSieve::GPUWorkList::GPUWorkList(uint32_t len,
                                       uint64_t *tests,
                                       uint64_t *cur_tests) {
   
+  log_str("creating new GPUWorkList", LOG_D);
   pthread_mutex_init(&access_mutex, NULL);
   pthread_cond_init(&notfull_cond, NULL);
   pthread_cond_init(&full_cond, NULL);
@@ -762,6 +771,7 @@ HybridSieve::GPUWorkList::GPUWorkList(uint32_t len,
 }
 
 HybridSieve::GPUWorkList::~GPUWorkList() {
+  log_str("deleting GPUWorkList", LOG_D);
   pthread_mutex_destroy(&access_mutex);
   pthread_cond_destroy(&notfull_cond);
   pthread_cond_destroy(&full_cond);
@@ -850,7 +860,7 @@ void HybridSieve::GPUWorkList::reinit(uint32_t prime_base[10], uint64_t target, 
   pthread_mutex_unlock(&access_mutex);
 }
 
-/* returns the nuber of candidates */
+/* returns the number of candidates */
 uint32_t HybridSieve::GPUWorkList::n_candidates() { return len * n_tests; }
 
 /* add a item to the list */
@@ -909,7 +919,7 @@ void HybridSieve::GPUWorkList::parse_results(uint32_t *results) {
 
 #ifdef DEBUG_FAST
   if (check != get_xor()) 
-    cout << "[DD] GPUWorkItems CNAGEND!!!!  " << check << " == " << get_xor() << endl;
+    cout << "[DD] GPUWorkItems CHANGED!!!!  " << check << " == " << get_xor() << endl;
 #endif
   
   uint32_t i = 0;
@@ -1099,7 +1109,7 @@ void HybridSieve::GPUWorkList::clear() {
   cur_len = 0;
 }
 
-/* tells this that it souzld be skiped anyway */
+/* tells this that it should be skipped anyway */
 void HybridSieve::GPUWorkItem::mark_skipable() {
   
   start = offsets[len - 1];
@@ -1118,7 +1128,7 @@ uint32_t HybridSieve::GPUWorkItem::get_end() { return first_end; }
  * it don't sets the start of the next item */
 void HybridSieve::GPUWorkItem::set_end() { first_end = (uint32_t) -1; }
 
-/* debuging realted functions */
+/* debugging related functions */
 #ifdef DEBUG_BASIC
 
 /* returns the prime at a given index offset i */

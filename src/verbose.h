@@ -23,9 +23,36 @@
 #include <inttypes.h>
 #include <string>
 
+using namespace std;
+
 extern pthread_mutex_t io_mutex;
 
-/* rerurn the current time */
-std::string get_time();
+/* returns the current time */
+string get_time();
+
+/**
+ * converts a given integer to a string
+ */
+string itoa(uint64_t i);
+
+/**
+ * converts a given double to a string
+ */
+string dtoa(double d, unsigned precision = 3);
+
+#define LOG_E 0
+#define LOG_W 1
+#define LOG_I 2
+#define LOG_D 3
+
+#ifdef NO_LOGGING
+#define log_str(str, status)
+#else
+#define log_str(str, status) \
+  log_string(string("[") + __FILE__ + ":" + itoa(__LINE__) + "] " + str, status)
+
+/* logs the given string */
+void log_string(string str, int status);
+#endif
 
 #endif /* __VERBOSE_H__ */

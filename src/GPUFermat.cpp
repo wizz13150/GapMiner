@@ -64,6 +64,7 @@ GPUFermat *GPUFermat::get_instance(unsigned device_id,
                                    const char *platformId,
                                    unsigned workItems) {
 
+  log_str("providing the only instance", LOG_D);
   pthread_mutex_lock(&creation_mutex);
   if (!initialized && 
       device_id != (unsigned)(-1) && 
@@ -83,6 +84,7 @@ GPUFermat::GPUFermat(unsigned device_id,
                      const char *platformId, 
                      unsigned workItems) {
 
+  log_str("creating GPUFermat", LOG_D);
   this->workItems = workItems;
   init_cl(device_id, platformId);
 
@@ -113,6 +115,7 @@ uint32_t *GPUFermat::get_candidates_buffer() {
 
 bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
 
+  log_str("init opencl", LOG_D);
   const char *platformName = "";
 
   if (strcmp(platformId, "amd") == 0)
@@ -303,7 +306,7 @@ bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
   OCLR(error, false);
   OCLR(clBuildProgram(gProgram, 1, &gpu, 0, 0, 0), false);
 
-  /** adl suport needs to be tested
+  /** adl support needs to be tested
   init_adl(mNumDevices);
   
   for(unsigned i = 0; i < mNumDevices; ++i){
@@ -460,6 +463,7 @@ void GPUFermat::run_fermat(cl_command_queue queue,
                            clBuffer &gpuResults,
                            unsigned elementsNum) {
 
+  log_str("running " + items(elementsNum) + " fermat tests on the gpu", LOG_D);
   numbers.copyToDevice(queue);
   gpuResults.copyToDevice(queue);
   primeBase.copyToDevice(queue);
@@ -517,14 +521,14 @@ void GPUFermat::test_gpu() {
       mpz_add_ui(mpz, mpz, rand32());
     }
 
-    /* make shure mpz is not a prime */
+    /* make sure mpz is not a prime */
     if (mpz_get_ui(mpz) & 0x1)
       mpz_add_ui(mpz, mpz, 1);
 
     size_t exported_size;
     mpz_export(prime_base, &exported_size, -1, 4, 0, 0, mpz);
   
-    /* creat the test numbers, every second will be prime */
+    /* create the test numbers, every second will be prime */
     for (unsigned i = 0; i < size; i++) {
 
       primes[i] = mpz_get_ui(mpz) & 0xffffffff;

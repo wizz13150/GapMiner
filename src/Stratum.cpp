@@ -76,7 +76,7 @@ Stratum *Stratum::only_instance;
 bool Stratum::running = true;
 
 /**
- * returns the possition of the first new line character in the given string
+ * returns the position of the first new line character in the given string
  */
 static inline ssize_t new_line_pos(char *str, size_t len) {
   
@@ -116,7 +116,7 @@ static inline ssize_t check_memory(char **buffer, ssize_t *capacity, ssize_t wan
 }
 
 /**
- * recives on line form a given socket file descriptor
+ * receives on line form a given socket file descriptor
  * Note: it reallocs space if needed
  * NOTE: *buffer has to be an dynamic allocated address
  */
@@ -133,7 +133,7 @@ ssize_t recv_line(int sock_fd, char **buffer, ssize_t *capacity, int flags) {
     if (check_memory(buffer, capacity, size + 1023) == -1)
       return -1;
 
-    /* recev on portion form sender or use old recvied portion */
+    /* receive on portion form sender or use old received portion */
     if (recved_size > 0) {
       
       memmove(*buffer, recv_buff, recved_size);
@@ -145,7 +145,7 @@ ssize_t recv_line(int sock_fd, char **buffer, ssize_t *capacity, int flags) {
     /* check for errors */
     if (size_one == -1) return -1;
 
-    /* search fo an new line char */
+    /* search for a new line char */
     ssize_t new_line_char = new_line_pos((*buffer) + size, size_one);
 
     /* adjust size */
@@ -158,7 +158,7 @@ ssize_t recv_line(int sock_fd, char **buffer, ssize_t *capacity, int flags) {
       /* part of the next line */
       recved_size = size - (new_line_char + 1);
 
-      /* save part of the next line for futer calls */
+      /* save part of the next line for future calls */
       if (recved_size > 0)
         memmove(recv_buff, (*buffer) + new_line_char + 1, recved_size);
 
@@ -180,6 +180,7 @@ Stratum *Stratum::get_instance(string *host,
                                uint16_t shift,
                                Miner *miner) {
   
+  log_str("get_instance", LOG_D);
   pthread_mutex_lock(&creation_mutex);
 
   /* allow only one creation */
@@ -223,6 +224,7 @@ Stratum *Stratum::get_instance(string *host,
  */
 void Stratum::reinit() {
 
+  log_str("reinit", LOG_D);
   int ret = -1;
 
   do {
@@ -266,6 +268,7 @@ void Stratum::reinit() {
  */
 bool Stratum::connect_to_addr(struct addrinfo *addr) {
 
+  log_str("connect_to_addr", LOG_D);
   bool ret = false;
 
   if (running) {
@@ -293,6 +296,8 @@ bool Stratum::connect_to_addr(struct addrinfo *addr) {
  */
 void Stratum::reconnect() {
 
+  log_str("reconnect", LOG_D);
+
   /* only one thread are allowed to (re)connect */
   pthread_mutex_lock(&connect_mutex);
 
@@ -313,7 +318,7 @@ void Stratum::reconnect() {
      
       if (ret != 0) {
         pthread_mutex_lock(&io_mutex);
-        cout << get_time() << "failed to optian pool ip: " << strerror(ret) << endl;
+        cout << get_time() << "failed to obtain pool ip: " << strerror(ret) << endl;
         pthread_mutex_unlock(&io_mutex);
       }
      
@@ -338,6 +343,7 @@ void Stratum::reconnect() {
 /* creates a new Stratum instance */
 Stratum::Stratum(Miner *miner) {
 
+  log_str("create", LOG_D);
   this->n_msgs = 0;
   this->targs = new ThreadArgs(miner, &shares);
   pthread_create(&thread, NULL, recv_thread, targs);
@@ -347,6 +353,7 @@ Stratum::Stratum(Miner *miner) {
 
 Stratum::~Stratum() {
   
+  log_str("delete", LOG_D);
   targs->running = false;
   pthread_join(thread, NULL);
   
@@ -391,6 +398,7 @@ Stratum::ThreadArgs::ThreadArgs(Miner *miner, map<int, double> *shares) {
  */
 void *Stratum::recv_thread(void *arg) {
   
+  log_str("recv_thread started", LOG_D);
   ThreadArgs *targs = (ThreadArgs *) arg;
   Miner *miner = targs->miner;
   map<int, double> *shares = targs->shares;
@@ -409,6 +417,7 @@ void *Stratum::recv_thread(void *arg) {
     /* receive message from server */
     if (recv_line(tcp_socket, &buffer, &buf_len, 0) < 0) {
 
+      log_str("recv: \"" + string(buffer, buf_len) + "\"", LOG_D);
       pthread_mutex_lock(&io_mutex);
       cout << get_time() << "Error receiving message form server: " << endl;
       pthread_mutex_unlock(&io_mutex);
@@ -425,6 +434,7 @@ void *Stratum::recv_thread(void *arg) {
     real_root = root;
  
     if(!root) {
+      log_str("jansson error: on line " + itoa(error.line) + ":" + error.text, LOG_W);
       pthread_mutex_lock(&io_mutex);
       cout << get_time() << "jansson error: on line " << error.line;
       cout << ": " << error.text << endl;
@@ -433,6 +443,7 @@ void *Stratum::recv_thread(void *arg) {
     }
  
     if (!json_is_object(root)) {
+      log_str("can not parse server response", LOG_W);
       pthread_mutex_lock(&io_mutex);
       cout << get_time() << "can not parse server response" << endl;
       pthread_mutex_unlock(&io_mutex);
@@ -456,11 +467,13 @@ void *Stratum::recv_thread(void *arg) {
         parse_block_work(miner, result);
 
       } else if (json_is_null(result)) {
+        log_str("Found share stale!", LOG_I);
         pthread_mutex_lock(&io_mutex);
         cout << get_time() << "Found share stale!" << endl;
         pthread_mutex_unlock(&io_mutex);
 
       } else {
+        log_str("can not parse server response", LOG_W);
         pthread_mutex_lock(&io_mutex);
         cout << get_time() << "can not parse server response" << endl;
         pthread_mutex_unlock(&io_mutex);
@@ -475,6 +488,7 @@ void *Stratum::recv_thread(void *arg) {
         parse_block_work(miner, params);
 
       } else {
+        log_str("can not parse server response", LOG_W);
         pthread_mutex_lock(&io_mutex);
         cout << get_time() << "can not parse server response" << endl;
         pthread_mutex_unlock(&io_mutex);
@@ -483,23 +497,29 @@ void *Stratum::recv_thread(void *arg) {
     }
   }
 
+  log_str("recv_thread stopped", LOG_D);
   return NULL;
 }
 
 /* helper function which processes an response share */
 void Stratum::process_share(map<int, double> *shares, int id, bool accepted) {
   
+  log_str("process_share", LOG_D);
   pthread_mutex_lock(&shares_mutex);
   bool share_not_found = (shares->find(id) == shares->end());
   pthread_mutex_unlock(&shares_mutex);
 
   if (share_not_found) {
+    log_str("Received invalid server response", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "Received invalid server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     return;
   }
   
+
+  log_str("Found Share: " + itoa(shares->at(id) * TWO_POW48) + " => " +
+      (accepted ? "accepted" : "stale!"), LOG_I);
 
   pthread_mutex_lock(&io_mutex);
   cout.precision(4);
@@ -519,6 +539,7 @@ void Stratum::process_share(map<int, double> *shares, int id, bool accepted) {
  */
 void Stratum::parse_block_work(Miner *miner, json_t *result) {
 
+  log_str("parse_block_work", LOG_D);
   json_t *tdiff;
 
   tdiff  = json_object_get(result, "difficulty");
@@ -536,6 +557,7 @@ void Stratum::parse_block_work(Miner *miner, json_t *result) {
 
   /* parse block data */
   if (!json_is_string(result)) {
+    log_str("can not parse server difficulty", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server block data" << endl;
     pthread_mutex_unlock(&io_mutex);
@@ -552,6 +574,9 @@ void Stratum::parse_block_work(Miner *miner, json_t *result) {
     miner->update_header(&head);
   else
     miner->start(&head);
+
+  log_str("Got new target: " + itoa(head.target) + " @ " + 
+      itoa(head.difficulty), LOG_I);
 
   pthread_mutex_lock(&io_mutex);
   cout.precision(7);
@@ -584,10 +609,12 @@ bool Stratum::sendwork(BlockHeader *header) {
     error = false;
 
     /* send the share to the pool */
+    log_str("sendwork: \"" + share + "\"", LOG_D);
     size_t ret = send(tcp_socket, share.c_str(), share.length(), 0);
  
     if (ret != share.length()) {
  
+      log_str("Submitting share failed", LOG_W);
       pthread_mutex_lock(&io_mutex);
       cout << get_time() << "Submitting share failed" << endl;
       pthread_mutex_unlock(&io_mutex);
@@ -629,10 +656,12 @@ BlockHeader *Stratum::getwork() {
   do {
     error = false;
 
+    log_str("getwork: \"" + request + "\"", LOG_D);
     size_t ret = send(tcp_socket, request.c_str(), request.length(), 0);
  
     if (ret != request.length()) {
  
+      log_str("Requesting work failed", LOG_W);
       pthread_mutex_lock(&io_mutex);
       cout << get_time() << "Requesting work failed" << endl;
       pthread_mutex_unlock(&io_mutex);
@@ -650,6 +679,7 @@ BlockHeader *Stratum::getwork() {
 
 void Stratum::stop() {
 
+  log_str("stop", LOG_D);
   Stratum::running = false;
   close(tcp_socket);
 }

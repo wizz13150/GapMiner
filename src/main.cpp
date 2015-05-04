@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <iomanip>
 #include "BlockHeader.h"
 #include "Miner.h"
 #include "PoWCore/src/PoWUtils.h"
@@ -53,6 +54,7 @@ static Miner *miner;
  */
 void soft_shutdown(int signum) {
 
+  log_str("soft_shutdown", LOG_D);
   (void) signum;
   
   static int shutdown = 0;
@@ -79,6 +81,8 @@ void soft_shutdown(int signum) {
 /* init signal handler */
 void init_signal() {
 
+  log_str("init_signal", LOG_D);
+
   /* set signal handler for soft shutdown */
   struct sigaction action;
   memset(&action, 0, sizeof(struct sigaction));
@@ -99,6 +103,7 @@ void init_signal() {
 /* periodically look if new work is available */
 void *getwork_thread(void *arg) {
 
+  log_str("getwork_thread started", LOG_D);
   Miner *miner = (Miner *) arg;
   Opts  *opts  = Opts::get_instance();
 
@@ -192,12 +197,15 @@ void *getwork_thread(void *arg) {
     }
   }
 
+  log_str("getwork_thread stopped", LOG_D);
   return NULL;
 }
 
 int main(int argc, char *argv[]) {
 
+  log_str("gapminer started", LOG_D);
   Opts *opts = Opts::get_instance(argc, argv);
+  log_str("args parsed", LOG_D);
 
   if (opts->has_license()) {
     cout << "    GapMiner is a standalone Gapcoin (GAP) CPU rpc miner                 " << endl;
@@ -250,7 +258,7 @@ int main(int argc, char *argv[]) {
   int n_threads = (opts->has_threads() ? atoi(opts->get_threads().c_str()) : 1);
 
   /* default 5 sec timeout */
-  int timeout = (opts->has_timeout() ? atoi(opts->get_timeout().c_str()) : 5);
+  int timeout = (opts->has_timeout() ? atoi(opts->get_timeout().c_str()) : 25);
 
   /* default shift 25 */
   uint16_t shift = (opts->has_shift() ?  atoi(opts->get_shift().c_str()) : 25);
@@ -319,10 +327,22 @@ int main(int argc, char *argv[]) {
     if (!opts->has_quiet() && !waiting) {
       pthread_mutex_lock(&io_mutex);
       cout << get_time();
-      cout << "pps: "      << (int) miner->primes_per_sec();
-      cout << " / "        << (int) miner->avg_primes_per_sec();
-      cout << "  tests/s " << (int) miner->tests_per_second();
-      cout << " / "        << (int) miner->avg_tests_per_second() << endl;
+      if (opts->has_cset() && miner->get_crt_status() < 100.0) {
+        cout << "init CRT [" << miner->get_crt_status() << " %]" << endl;
+      } else {
+        cout << "pps: "      << (int) miner->primes_per_sec();
+        cout << " / "        << (int) miner->avg_primes_per_sec();
+        cout << "  tests/s " << (int) miner->tests_per_second();
+        cout << " / "        << (int) miner->avg_tests_per_second();
+        cout << "  gaps/s " << (int) miner->gaps_per_second();
+        cout << " / "        << (int) miner->avg_gaps_per_second();
+        if (opts->has_cset()) {
+          cout << "  gaplist " << ChineseSieve::gaplist_size();
+          cout << "  share [" << setprecision(3);
+          cout << miner->next_share_percent() << " %]";
+        }
+        cout << endl;
+      }
       pthread_mutex_unlock(&io_mutex);
     }
   }

@@ -78,6 +78,7 @@ size_t curl_read(void *ptr, size_t size, size_t nmemb, void *user_data) {
 
   if (pos < len) {
     unsigned int bytes = (size * nmemb >= len - pos) ? len - pos : size * nmemb;
+    log_str("curl_read: \"" + string(rpccmd->c_str() + pos, bytes) + "\"", LOG_D);
     memcpy(ptr, rpccmd->c_str() + pos, bytes);
     
     pos += bytes;
@@ -94,8 +95,10 @@ size_t curl_read(void *ptr, size_t size, size_t nmemb, void *user_data) {
 size_t curl_write(char *ptr, size_t size, size_t nmemb, void *user_data) {
   stringstream *ss = (stringstream *) user_data;
   
-  if ((size * nmemb) > 0)
+  if ((size * nmemb) > 0) {
+    log_str("curl_write: \"" + string(ptr, size * nmemb) + "\"", LOG_D);
     ss->write(ptr, size * nmemb);
+  }
 
   return size * nmemb;
 }
@@ -105,6 +108,7 @@ size_t curl_write(char *ptr, size_t size, size_t nmemb, void *user_data) {
  */
 size_t curl_header(char *ptr, size_t size, size_t nmemb, void *user_data) {
 
+  log_str("curl_header: \"" + string(ptr, size * nmemb) + "\"", LOG_D);
   static string lp_str("X-Long-Polling: ");
   Rpc::LongPoll *longpoll = (Rpc::LongPoll *) user_data;
 
@@ -130,6 +134,7 @@ size_t curl_header(char *ptr, size_t size, size_t nmemb, void *user_data) {
  */
 bool Rpc::init_curl(string userpass, string url, int timeout) {
 
+  log_str("init curl with timeout: " +  itoa(timeout), LOG_D);
   curl_global_init(CURL_GLOBAL_ALL);
 
   curl_recv = curl_easy_init();
@@ -179,6 +184,7 @@ bool Rpc::init_curl(string userpass, string url, int timeout) {
 /* return the only instance of this */
 Rpc *Rpc::get_instance() {
 
+  log_str("get_instance", LOG_D);
   pthread_mutex_lock(&creation_mutex);
   if (!initialized) {
     only_instance = new Rpc();
@@ -201,6 +207,8 @@ Rpc::~Rpc() { }
  * do_lp indicates whether to make a long poll request or not.
  */
 BlockHeader *Rpc::getwork(bool do_lp) {
+
+  log_str("getwork request", LOG_D);
 
   /* building http header */
   char content_len[64];
@@ -239,6 +247,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
   res = curl_easy_perform(curl_recv);
 
   if (!init_msg && longpoll.supported) {
+    log_str("Server supports longpoll", LOG_D);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "Server supports longpoll" << endl; 
     pthread_mutex_unlock(&io_mutex);
@@ -247,13 +256,15 @@ BlockHeader *Rpc::getwork(bool do_lp) {
 
   /* long poll timed out make normal getwork request */
   if (res == CURLE_OPERATION_TIMEDOUT && do_lp) {
+    log_str("longpoll timeout reached", LOG_D);
     return getwork(false);
   }
 
   /* Check for errors */ 
   if(res != CURLE_OK)  {
+    log_str("curl_easy_perform() failed to recv: "+ curl_easy_strerror(res), LOG_W);
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "curl_easy_perform() failed: "; 
+    cout << get_time() << "curl_easy_perform() failed to recv: "; 
     cout << curl_easy_strerror(res) << endl;
     pthread_mutex_unlock(&io_mutex);
     return NULL;
@@ -268,6 +279,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
   recv_ss->str("");
 
   if(!root) {
+    log_str("jansson error: on line " + itoa(error.line) + ":" + error.text, LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "jansson error: on line " << error.line;
     cout << ": " << error.text << endl;
@@ -276,6 +288,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
   }
 
   if (!json_is_object(root)) {
+    log_str("can not parse server response", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
@@ -285,6 +298,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
   root = json_object_get(root, "result");
 
   if (!json_is_object(root)) {
+    log_str("can not parse server response", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
@@ -293,6 +307,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
   }
   tdiff = json_object_get(root, "difficulty");
   if (!json_is_integer(tdiff)) {
+    log_str("can not parse server difficulty", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server difficulty" << endl;
     pthread_mutex_unlock(&io_mutex);
@@ -305,6 +320,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
 
   root = json_object_get(root, "data");
   if (!json_is_string(root)) {
+    log_str("can not parse server response", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
@@ -325,6 +341,7 @@ BlockHeader *Rpc::getwork(bool do_lp) {
  */
 bool Rpc::sendwork(BlockHeader *header) {
 
+  log_str("sendwork request", LOG_D);
   stringstream data;
   data << "{\"jsonrpc\": \"1.0\", ";
   data << "\"id\":\"" USER_AGENT "\", ";
@@ -358,8 +375,9 @@ bool Rpc::sendwork(BlockHeader *header) {
 
   /* Check for errors */ 
   if(res != CURLE_OK) {
+    log_str("curl_easy_perform() failed to send: "+ curl_easy_strerror(res), LOG_W);
     pthread_mutex_lock(&io_mutex);
-    cout << get_time() << "curl_easy_perform() failed: ";
+    cout << get_time() << "curl_easy_perform() failed to send: ";
     cout << curl_easy_strerror(res) << endl;
     pthread_mutex_unlock(&io_mutex);
     return false;
@@ -374,28 +392,31 @@ bool Rpc::sendwork(BlockHeader *header) {
   recv_ss->str("");
 
   if(!root) {
+    log_str("jansson error: on line " + itoa(error.line) + ":" + error.text, LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "jansson error: on line " << error.line;
     cout << ": " << error.text << endl;
     pthread_mutex_unlock(&io_mutex);
-    return NULL;
+    return false;
   }
 
   if (!json_is_object(root)) {
+    log_str("can not parse server response", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
-    return NULL;
+    return false;
   }
   root = json_object_get(root, "result");
 
   if (!json_is_boolean(root)) {
+    log_str("can not parse server response", LOG_W);
     pthread_mutex_lock(&io_mutex);
     cout << get_time() << "can not parse server response" << endl;
     pthread_mutex_unlock(&io_mutex);
     json_decref(root);
-    return NULL;
+    return false;
   }
   bool result = json_is_true(root);
   json_decref(root);

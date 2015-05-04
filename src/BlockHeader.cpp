@@ -28,6 +28,7 @@
 #include <vector>
 #include "BlockHeader.h"
 #include "PoWCore/src/PoWUtils.h"
+#include "verbose.h"
 
 using namespace std;
 
@@ -41,6 +42,8 @@ BlockHeader::BlockHeader() {
  * (little endian format)
  */
 BlockHeader::BlockHeader(string *hex) {
+
+  log_str("creating BlockHeader from \"" + *hex + "\"", LOG_D);
 
   /* clear block header */
   set_null();
@@ -128,12 +131,15 @@ string BlockHeader::get_hex() {
     hex.push_back('0');
   }
 
+  log_str("return BlockHeader as \"" + hex + "\"", LOG_D);
   delete header;
   return hex;
 }
 
 /* clones this */
 BlockHeader *BlockHeader::clone() {
+
+  log_str("cloning BlockHeader", LOG_D);
   BlockHeader *header = new BlockHeader;
 
   header->version    = version;
@@ -153,6 +159,7 @@ BlockHeader *BlockHeader::clone() {
 /* returns the header of this as a mpz value */
 void BlockHeader::get_hash(mpz_t mpz_hash) {
   
+  log_str("creating BlockHeader hash", LOG_D);
   uint8_t hash[SHA256_DIGEST_LENGTH];
   uint8_t tmp[SHA256_DIGEST_LENGTH];                                   
 
@@ -177,11 +184,18 @@ void BlockHeader::get_hash(mpz_t mpz_hash) {
 /* returns whether byte order is little endian */
 bool BlockHeader::have_little_endian() {
   int val = 1;
+  
+  log_str("BlockHeader byte order: " + 
+      ((*(char *) &val == 1) ? "little" : "big") + 
+      " endian", 
+      LOG_D);
+
   return *(char *) &val == 1 ;
 }
 
 /* clears the block header */
 void BlockHeader::set_null() {
+  log_str("clearing BlockHeader", LOG_D);
   memset(hash_prev_block,  0, SHA256_DIGEST_LENGTH);
   memset(hash_merkle_root, 0, SHA256_DIGEST_LENGTH);
 
@@ -199,6 +213,7 @@ void BlockHeader::set_null() {
  */
 void BlockHeader::switch_byte_oder(BlockHeader *header) {
 
+  log_str("BlockHeader switching  byte oder", LOG_D);
   header->version    = byte_swap(header->version);
   header->time       = byte_swap(header->time);
   header->difficulty = byte_swap(header->difficulty);
@@ -251,6 +266,7 @@ inline void BlockHeader::byte_swap(vector<uint8_t> *val) {
 /* returns this as a string representation */
 string BlockHeader::to_s() {
 
+  log_str("returning BlockHeader as string", LOG_D);
   BlockHeader *header = clone();
   string str;
 
@@ -301,6 +317,7 @@ string BlockHeader::to_s() {
 /* returns whether this and other are equal */
 bool BlockHeader::equal(BlockHeader *other) {
   
+  log_str("BlockHeader equal", LOG_D);
   if (this->version != other->version) 
     return false;
  
@@ -337,6 +354,7 @@ bool BlockHeader::equal(BlockHeader *other) {
 /* returns whether this and other having the same block height */
 bool BlockHeader::equal_block_height(BlockHeader *other) {
 
+  log_str("BlockHeader equal_block_height", LOG_D);
   for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
     if (this->hash_prev_block[i] != other->hash_prev_block[i])
       return false;
@@ -347,6 +365,7 @@ bool BlockHeader::equal_block_height(BlockHeader *other) {
 /* creates a PoW from this */
 PoW BlockHeader::get_pow() {
   
+  log_str("returning a PoW for BlockHeader", LOG_D);
   mpz_t mpz_hash, mpz_adder;
   mpz_init(mpz_hash);
   mpz_init(mpz_adder);

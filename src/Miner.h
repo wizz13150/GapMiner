@@ -22,6 +22,7 @@
 #include "BlockHeader.h"
 #include "PoWCore/src/Sieve.h"
 #include "HybridSieve.h"
+#include "ChineseSieve.h"
 
 
 class Miner {
@@ -56,21 +57,42 @@ class Miner {
     double primes_per_sec();
 
     /**
-     * returs the prime tests per second
+     * returns the prime gaps per second
+     */
+    double gaps_per_second();
+
+    /**
+     * returns average the prime gaps per second
+     */
+    double avg_gaps_per_second();
+
+    /**
+     * returns the prime tests per second
      */
     double tests_per_second();
 
     /**
-     * returs average the prime tests per second
+     * returns average the prime tests per second
      */
     double avg_tests_per_second();
+
+    /**
+     * returns the percent we have already calculated form the current share
+     */
+    double next_share_percent();
 
     /**
      * returns whether this is running
      */
     bool started();
 
+    /* return the crt status */
+    double get_crt_status();
+
   private:
+    
+    /* number of fermat threads */
+    int fermat_threads;
 
     /* sieve size */
     uint64_t sieve_size;
@@ -86,6 +108,9 @@ class Miner {
 
     /* indicates if this is started */
     bool is_started;
+
+    /* indicates if we should use Chinese Remainder theorem or not */
+    bool use_chinese;
 
 #ifndef CPU_ONLY
     /* indicates if we should use gpu or not */
@@ -114,6 +139,9 @@ class Miner {
 
         /* the Block header to mine for */
         BlockHeader *header;
+
+        /* the ChineseSieve for this */
+        ChineseSieve *csieve;
 
 #ifndef CPU_ONLY
         /* the HybridSieve for this */

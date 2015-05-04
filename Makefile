@@ -5,7 +5,7 @@ CC        = g++
 DBFLAGS   = -g
 CXXFLAGS  = -Wall -Wextra -c -Winline -Wformat -Wformat-security \
             -pthread --param max-inline-insns-single=1000 -lm \
-						-Wno-write-strings -I/opt/AMDAPP/include -g
+						-I/opt/AMDAPP/include 
 LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson \
 					  -L/opts/AMDAPP/lib -lOpenCL
 OTFLAGS   = -march=native -O3
@@ -32,6 +32,8 @@ install: all
 # GPU-Miner enable slow debugging (more tests)
 #CXXFLAGS += -D DEBUG_BASIC -D DEBUG_FAST -D DEBUG_SLOW
 
+# ChineseSieve debugging
+#CXXFLAGS += -D DEBUG_PREV_PRIME
 
 # optimization
 CXXFLAGS  += $(OTFLAGS)

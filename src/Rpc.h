@@ -51,7 +51,7 @@ class Rpc {
      * initialize curl with the given 
      * username, password, url, and port
      */
-    static bool init_curl(string userpass, string url, int timeout = 5);
+    static bool init_curl(string userpass, string url, int timeout = 25);
 
     /* subclass for storing long poll informations */
     class LongPoll {

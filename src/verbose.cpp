@@ -28,9 +28,38 @@
 #include <time.h>
 #include <gmp.h>
 #include <string>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <math.h>
+#include "verbose.h"
 
-/* rerurn the current time */
-std::string get_time() {
+/**
+ * converts a given integer to a string
+ */
+string itoa(uint64_t i) {
+
+  char a[32];
+
+  if (i == 0) {
+    a[0] = '0';
+    a[1] = '\0';
+    return string(a);
+  }
+
+  uint64_t j;
+  for (j = 0; i != 0; j++, i /= 10)
+    a[j] = 48 + (i % 10);
+
+  a[j] = '\0';
+  string str = string(a);;
+  return string(str.rbegin(), str.rend());
+}
+
+/* returns the current time */
+string get_time() {
   time_t timer;
   char buffer[25];
   struct tm* tm_info;
@@ -39,7 +68,20 @@ std::string get_time() {
   tm_info = localtime(&timer);
 
   strftime(buffer, 25, "\r[%Y-%m-%d %H:%M:%S] ", tm_info);
-  return std::string(buffer);
+  return string(buffer);
+}
+
+/**
+ * converts a given double to a string
+ */
+string dtoa(double d, unsigned precision) {
+  
+  if (precision == 0)
+    return itoa((uint64_t) d);
+
+  return itoa((uint64_t) d) + "." +
+         itoa((uint64_t) (d * pow(10, precision) - 
+              ((uint64_t) d) * pow(10, precision)));
 }
 
 /**
@@ -47,3 +89,45 @@ std::string get_time() {
  */
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* log file descriptor */
+static int log_fd = 0;
+
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+#define write_str(fd, str) write(fd, str, strlen(str))
+
+#ifndef NO_LOGGING
+/* logs the given string */
+void log_string(string str, int status) {
+  
+  pthread_mutex_lock(&log_mutex);
+  if (log_fd == 0) {
+    log_fd = open("gapminer.log", O_CREAT|O_TRUNC|O_WRONLY, 00777);
+    if (log_fd < 0) {
+      perror("failed to open log");
+      return;
+    }
+  }
+
+  if (status == LOG_E)
+    write_str(log_fd, "[EE]");
+  else if (status == LOG_W)
+    write_str(log_fd, "[WW]");
+  else if (status == LOG_I)
+    write_str(log_fd, "[II]");
+  else 
+    write_str(log_fd, "[DD]");
+
+  string time = get_time();
+  write(log_fd, time.c_str() + 1, time.length() - 2);
+
+  for (unsigned i = 0; i < str.length(); i++)
+    if (str[i] == '\n')
+      str[i] = ' ';
+
+  write_str(log_fd, str.c_str());
+  write_str(log_fd, "\n");
+
+  pthread_mutex_unlock(&log_mutex);
+}
+#endif
