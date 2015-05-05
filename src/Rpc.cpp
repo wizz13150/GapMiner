@@ -24,7 +24,7 @@
 #endif
 #include "Rpc.h"
 #include <jansson.h>
-#include "verbose.h"
+#include "utils.h"
 
 using namespace std;
 

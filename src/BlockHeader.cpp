@@ -28,7 +28,7 @@
 #include <vector>
 #include "BlockHeader.h"
 #include "PoWCore/src/PoWUtils.h"
-#include "verbose.h"
+#include "utils.h"
 
 using namespace std;
 

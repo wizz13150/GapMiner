@@ -33,7 +33,7 @@
 #include "ShareProcessor.h"
 #include "PoWCore/src/Sieve.h"
 #include "Opts.h"
-#include "verbose.h"
+#include "utils.h"
 #include "HybridSieve.h"
 
 /* synchronization mutex */

@@ -31,7 +31,7 @@
 #include "BlockHeader.h"
 #include "ShareProcessor.h"
 #include "Rpc.h"
-#include "verbose.h"
+#include "utils.h"
 #include "Opts.h"
 #include "Stratum.h"
 

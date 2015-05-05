@@ -1,5 +1,5 @@
 /**
- * Header file of some thread safe verbose functions
+ * Header file of some utility functions
  *
  * Copyright (C)  2014  The Gapcoin developers  <info@gapcoin.org>
  * 
@@ -16,9 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __VERBOSE_H__
-#define __VERBOSE_H__
+#ifndef __UTILS_H__
+#define __UTILS_H__
  
+#include <stdlib.h>
 #include <gmp.h>
 #include <inttypes.h>
 #include <string>
@@ -55,4 +56,36 @@ string dtoa(double d, unsigned precision = 3);
 void log_string(string str, int status);
 #endif
 
-#endif /* __VERBOSE_H__ */
+inline uint32_t rand32(uint32_t *x) {
+  *x ^= *x << 13;
+  *x ^= *x >> 17;
+  *x ^= *x << 5;
+  return *x;
+}
+
+/* random value */
+typedef struct {
+  uint32_t x, y, z, w;
+} rand128_t; 
+
+inline rand128_t *new_rand128_t(uint32_t seed) {
+  rand128_t *rand = (rand128_t *) malloc(sizeof(rand128_t));
+
+  rand->x = rand32(&seed);
+  rand->y = rand32(&seed);
+  rand->z = rand32(&seed);
+  rand->w = rand32(&seed);
+
+  return rand;
+}
+                      
+inline uint32_t rand128(rand128_t *rand) {
+                               
+  uint32_t t = rand->x ^ (rand->x << 11);
+  rand->x = rand->y; rand->y = rand->z; rand->z = rand->w;
+  rand->w ^= (rand->w >> 19) ^ t ^ (t >> 8);
+                                      
+  return rand->w;
+}
+
+#endif /* __UTILS_H__ */

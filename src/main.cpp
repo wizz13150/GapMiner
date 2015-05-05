@@ -33,7 +33,7 @@
 #include "PoWCore/src/PoWUtils.h"
 #include "Opts.h"
 #include "Rpc.h"
-#include "verbose.h"
+#include "utils.h"
 #include "Stratum.h"
 #include "GPUFermat.h"
 
@@ -326,21 +326,39 @@ int main(int argc, char *argv[]) {
 
     if (!opts->has_quiet() && !waiting) {
       pthread_mutex_lock(&io_mutex);
-      cout << get_time();
       if (opts->has_cset() && miner->get_crt_status() < 100.0) {
-        cout << "init CRT [" << miner->get_crt_status() << " %]" << endl;
+        cout << get_time() << "init CRT [" << miner->get_crt_status() << " %]" << endl;
       } else {
-        cout << "pps: "      << (int) miner->primes_per_sec();
-        cout << " / "        << (int) miner->avg_primes_per_sec();
-        cout << "  tests/s " << (int) miner->tests_per_second();
-        cout << " / "        << (int) miner->avg_tests_per_second();
-        cout << "  gaps/s " << (int) miner->gaps_per_second();
-        cout << " / "        << (int) miner->avg_gaps_per_second();
+#ifdef WINDOWS      
+        string time = get_time();
+        cout << time << "pps: " << (uint64_t) miner->primes_per_sec();
+        cout << " / "           << (uint64_t) miner->avg_primes_per_sec();
+        cout << " tests/s " << (uint64_t) miner->tests_per_second();
+        cout << " / "        << (uint64_t) miner->avg_tests_per_second() << endl;
+
+        for (unsigned i = 1; i < time.length(); i++) cout << " ";
+        cout << "gaps/s " << (uint64_t) miner->gaps_per_second();
+        cout << " / "        << (uint64_t) miner->avg_gaps_per_second();
+
         if (opts->has_cset()) {
           cout << "  gaplist " << ChineseSieve::gaplist_size();
-          cout << "  share [" << setprecision(3);
+          cout << "  block [" << setprecision(3);
           cout << miner->next_share_percent() << " %]";
         }
+#else
+        cout << get_time();
+        cout << "pps: "      << (uint64_t) miner->primes_per_sec();
+        cout << " / "        << (uint64_t) miner->avg_primes_per_sec();
+        cout << "  tests/s " << (uint64_t) miner->tests_per_second();
+        cout << " / "        << (uint64_t) miner->avg_tests_per_second();
+        cout << "  gaps/s " << (uint64_t) miner->gaps_per_second();
+        cout << " / "        << (uint64_t) miner->avg_gaps_per_second();
+        if (opts->has_cset()) {
+          cout << "  gaplist " << ChineseSieve::gaplist_size();
+          cout << "  block [" << setprecision(3);
+          cout << miner->next_share_percent() << " %]";
+        }
+#endif      
         cout << endl;
       }
       pthread_mutex_unlock(&io_mutex);

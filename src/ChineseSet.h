@@ -21,67 +21,71 @@
 #include <gmp.h>
 #include "PoWCore/src/PoWUtils.h"
 #include "PoWCore/src/Sieve.h"
+#include "utils.h"
 
 class ChineseSet {
 
   public:
 
-     /* the number of primes used for this */
-     sieve_t n_primes;
-     
-     /* the intervall size used for this */
-     sieve_t size;
-     
-     /* the byte size of the sieve */
-     sieve_t byte_size;
-     
-     /* the primorial */
-     mpz_t mpz_primorial;
-     
-     /* the primorial offset */
-     mpz_t mpz_offset;
-     
-     /* the number of prime candidates still in this */
-     sieve_t n_candidates;
-     
-     /* the min shift amount needed */
-     sieve_t bit_size;
-     
-     /* the pre sieved numer range */
-     sieve_t *sieve;
+    /* the number of primes used for this */
+    sieve_t n_primes;
+    
+    /* the intervall size used for this */
+    sieve_t size;
+    
+    /* the byte size of the sieve */
+    sieve_t byte_size;
+    
+    /* the primorial */
+    mpz_t mpz_primorial;
+    
+    /* the primorial offset */
+    mpz_t mpz_offset;
+    
+    /* the number of prime candidates still in this */
+    sieve_t n_candidates;
+    
+    /* the min shift amount needed */
+    sieve_t bit_size;
+    
+    /* the pre sieved numer range */
+    sieve_t *sieve;
 
-     /* the nubre of average candidates in the sieve */
-     double avg_candidates;
+    /* the nubre of average candidates in the sieve */
+    double avg_candidates;
 
-     /* the max merit of this */
-     double max_merit;
+    /* the max merit of this */
+    double max_merit;
      
-     /* creats a new ChineseSet */
-     ChineseSet(sieve_t n_primes, 
-                sieve_t size, 
-                sieve_t n_candidates, 
-                const char *offset);
+    /* random */
+    rand128_t *rand; 
 
-     /* creats a new ChineseSet */
-     ChineseSet(sieve_t n_primes, 
-                sieve_t size, 
-                sieve_t n_candidates, 
-                mpz_t mpz_offset);
+    /* creats a new ChineseSet */
+    ChineseSet(sieve_t n_primes, 
+               sieve_t size, 
+               sieve_t n_candidates, 
+               const char *offset);
 
-     /* saves this to a file */
-     void save(FILE *file);
-     void save(const char *fname);
+    /* creats a new ChineseSet */
+    ChineseSet(sieve_t n_primes, 
+               sieve_t size, 
+               sieve_t n_candidates, 
+               mpz_t mpz_offset);
 
-     /* creats a new ChineseSet */
-     ChineseSet(FILE *file);
-     ChineseSet(const char *fname);
+    /* saves this to a file */
+    void save(FILE *file);
+    void save(const char *fname);
 
-     ~ChineseSet();
+    /* creats a new ChineseSet */
+    ChineseSet(FILE *file);
+    ChineseSet(const char *fname);
 
-     /* returns the theoreticaly speed increas factor for a given merit */
-     double get_speed_factor(double merit);
+    ~ChineseSet();
 
-   private:
+    /* returns the theoreticaly speed increas factor for a given merit */
+    double get_speed_factor(double merit);
+
+  private:
 
     /* init this */
     void init();

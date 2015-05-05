@@ -21,9 +21,10 @@
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <math.h>
 #include "ChineseSet.h"
-#include "verbose.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -219,9 +220,9 @@ void ChineseSet::init() {
   this->bit_size  = mpz_sizeinbase(mpz_primorial, 2);
 
   /* calculate the speed increase */
-  srand(time(NULL) ^ (sieve_t) sieve ^ getpid() ^ n_primes ^ size ^ n_candidates);
   sieve_t avg_count = 0;
   sieve = (sieve_t *) malloc(byte_size);
+  this->rand = new_rand128_t(time(NULL) ^ getpid() ^ n_primes ^ size ^ n_candidates);
 
   /** calculate the average candidates per sieve */
   for (sieve_t i = 0; i < 10000u; i++) {
@@ -230,11 +231,11 @@ void ChineseSet::init() {
     /* applay the previous calculated layers */
     for (sieve_t x = 0; x < n_primes; x++) {
     
-      const sieve_t index = rand() % first_primes[x];
+      const sieve_t index = rand128(this->rand) % first_primes[x];
       const sieve_t prime = first_primes[x];
       
       /* for each posible residue calss creat one sieve */
-      for (sieve_t p = prime - index; p < size; p += prime)
+      for (sieve_t p = index; p < size; p += prime)
         set_composite(sieve, p);
 
     }

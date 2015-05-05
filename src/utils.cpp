@@ -1,5 +1,5 @@
 /**
- * Implementation of some thread safe verbose functions
+ * Implementation of some utility functions
  *
  * Copyright (C)  2014  The Gapcoin developers  <info@gapcoin.org>
  * 
@@ -34,7 +34,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
-#include "verbose.h"
+#include "utils.h"
 
 /**
  * converts a given integer to a string

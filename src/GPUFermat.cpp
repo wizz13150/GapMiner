@@ -10,7 +10,7 @@
 #include <gmpxx.h>
 
 #include "GPUFermat.h"
-#include "verbose.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -238,7 +238,7 @@ bool GPUFermat::init_cl(unsigned device_id, const char *platformId) {
       size_t logSize;
       clGetProgramBuildInfo(gProgram, devices[0], CL_PROGRAM_BUILD_LOG, 0, 0, &logSize);
       
-      std::unique_ptr<char[]> log(new char[logSize]);
+      std::unique_ptr<char[]> log_str(new char[logSize]);
       clGetProgramBuildInfo(gProgram, devices[0], CL_PROGRAM_BUILD_LOG, logSize, log.get(), 0);
       pthread_mutex_lock(&io_mutex);                            
       cout << get_time() <<  log.get() << endl;

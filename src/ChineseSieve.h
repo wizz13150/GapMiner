@@ -21,6 +21,7 @@
 #include "GapCandidate.h"
 #include "PoWCore/src/PoW.h"
 #include "PoWCore/src/Sieve.h"
+#include "utils.h"
 #include <vector>
 #include <openssl/sha.h>
 
@@ -88,6 +89,9 @@ class ChineseSieve : public Sieve {
 
     /* primality testing */
     mpz_t mpz_e, mpz_r, mpz_two;
+
+    /* random */
+    rand128_t *rand; 
 
     /**
      * Fermat pseudo prime test

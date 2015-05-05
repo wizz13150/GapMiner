@@ -34,7 +34,7 @@
 #endif
 
 #include "Stratum.h"
-#include "verbose.h"
+#include "utils.h"
 
 #include "Opts.h"
 

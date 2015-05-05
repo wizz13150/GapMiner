@@ -32,7 +32,7 @@
 #include <pthread.h>
 #include <iostream>
 
-#include "verbose.h"
+#include "utils.h"
 #include "HybridSieve.h"
 #include "Opts.h"
 
@@ -395,7 +395,7 @@ void *HybridSieve::gpu_work_thread(void *args) {
     mpz_set(mpz_start, sitem->mpz_start);
 
     double d_difficulty = ((double) pow->get_target()) / TWO_POW48;
-    sieve_t min_len     = log(mpz_get_d(mpz_start)) * d_difficulty;
+    sieve_t min_len     = log_str(mpz_get_d(mpz_start)) * d_difficulty;
     sieve_t start       = 0;
     sieve_t i           = 1;
 

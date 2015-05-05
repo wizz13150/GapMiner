@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <time.h>
 #include "PoWCore/src/PoWUtils.h"
 #include "ChineseSieve.h"
 #include <iostream>
@@ -27,7 +29,7 @@
 #include <math.h>
 #include <vector>
 #include <openssl/sha.h>
-#include "verbose.h"
+#include "utils.h"
 #include "Opts.h"
 
 using namespace std;
@@ -174,23 +176,22 @@ void ChineseSieve::calc_avg_prime_candidates() {
 
     for (sieve_t x = 0; x < n_primes; x++) {
     
-      const sieve_t index = rand() % primes[x];
+      const sieve_t index = rand128(this->rand) % primes[x];
       const sieve_t prime = primes[x];
       
       for (sieve_t p = index; p < sievesize; p += prime)
         set_composite(sieve, p);
-
     }
 
     /* count the candidates */
-    sieve_t cur_count = 0;
-    for (sieve_t s = 0; s < (sievesize / 8) / sizeof(sieve_t); s++)
-      cur_count += popcount(sieve[s]);
-
-    avg_count += cur_count;
+    for (sieve_t s = 0; s < sievesize; s++)
+  	  if (is_prime(sieve, s)) 
+        avg_count++;
+	
   }
   this->crt_status = 100.0;
-  this->avg_prime_candidates = sievesize - (((double) avg_count) / 1000);
+  
+  this->avg_prime_candidates = (((double) avg_count) / 1000);
   log_str("avg_prime_candidates: " + itoa(this->avg_prime_candidates), LOG_D);
 }
 
@@ -220,13 +221,14 @@ ChineseSieve::ChineseSieve(PoWProcessor *processor,
   this->avg_prime_candidates = 0.0;
   this->crt_status           = 0.000001;
   this->cur_merit            = 1.0;
+  this->rand = new_rand128_t(time(NULL) ^ getpid() ^ n_primes ^ sievesize);
 
   mpz_init(this->mpz_e);
   mpz_init(this->mpz_r);
   mpz_init_set_ui64(this->mpz_two, 2);
   calc_primorial_reminder();
 
-  this->max_merit = sievesize / (atoi(Opts::get_instance()->get_shift().c_str()) + 256) * log(2);
+  this->max_merit = sievesize / ((atoi(Opts::get_instance()->get_shift().c_str()) + 256) * log(2));
 
   log_str("Creating ChineseSieve with" + itoa(cset->n_primes) + 
       " and a gap size of "  + itoa(cset->bit_size) + 
@@ -363,11 +365,17 @@ void ChineseSieve::run_fermat() {
   mpz_t mpz_p, mpz_hash;
   mpz_init(mpz_p);
   mpz_init(mpz_hash);
+
+  sieve_t shift    = atoi(Opts::get_instance()->get_shift().c_str());
+  sieve_t interval = (25L * 1000LL * 1000LL) / (shift * shift);
+  sieve_t index = 0;
+  sieve_t n_test = 0;
   double log_start = 0.0;
   sieve_t speed_factor = 0;
+  uint64_t time = PoWUtils::gettime_usec();
 
   for (;;) {
-    uint64_t time = PoWUtils::gettime_usec();
+    index++;
 
     /* get the next best GapCandidate */
     pthread_mutex_lock(&mutex);
@@ -382,11 +390,10 @@ void ChineseSieve::run_fermat() {
     gaps.pop_back();
 
     cur_merit  = ((double) gap->target) / TWO_POW48;
-    gaps_since_share += cur_n_gaps * speed_factor;
+    gaps_since_share += 1 * speed_factor;
     pthread_mutex_unlock(&mutex);
 
     bool found_prime = false;
-    sieve_t n_test = 0;
 
     /* check all prime candidates for the current GapCandidate */
     for (unsigned i = 0; i < gap->n_candidates && !found_prime; i++) {
@@ -423,23 +430,26 @@ void ChineseSieve::run_fermat() {
 
     } 
 
-    tests += n_test;
-    cur_tests = (cur_tests + 3 * n_test) / 4;
-
-
-    if (log_start < 1) 
-      log_start = mpz_log(gap->mpz_gap_start);
-      
-    speed_factor = get_speed_factor(cur_merit, gap->n_candidates);
-
-    cur_n_gaps = 1;
-    cur_found_primes = (cur_found_primes + 3 * (sievesize * speed_factor / log_start)) / 4;
-    found_primes += sievesize * speed_factor / log_start;
-
-    n_gaps += cur_n_gaps;
-    uint64_t cur_time = PoWUtils::gettime_usec() - time;
-    passed_time      += cur_time;
-    cur_passed_time   = (cur_passed_time + 3 * cur_time) / 4;
+    if (index % interval == 0) {
+      tests += n_test;
+      cur_tests = (cur_tests + 3 * n_test) / 4;
+     
+     
+      if (log_start < 1) 
+        log_start = mpz_log(gap->mpz_gap_start);
+        
+      speed_factor = get_speed_factor(cur_merit, gap->n_candidates);
+     
+      cur_n_gaps = interval;
+      cur_found_primes = (cur_found_primes + 3 * (sievesize * interval * speed_factor / log_start)) / 4;
+      found_primes += sievesize * interval * speed_factor / log_start;
+     
+      n_gaps += cur_n_gaps;
+      uint64_t cur_time = PoWUtils::gettime_usec() - time;
+      passed_time      += cur_time;
+      cur_passed_time   = (cur_passed_time + 3 * cur_time) / 4;
+      time = PoWUtils::gettime_usec();
+    }
 
     delete gap;
   }
