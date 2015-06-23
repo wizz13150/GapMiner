@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
   /* 1 thread default */
   int n_threads = (opts->has_threads() ? atoi(opts->get_threads().c_str()) : 1);
 
-  /* default 5 sec timeout */
+  /* default 25 sec timeout */
   int timeout = (opts->has_timeout() ? atoi(opts->get_timeout().c_str()) : 25);
 
   /* default shift 25 */
