@@ -36,6 +36,8 @@
 #include "utils.h"
 #include "Stratum.h"
 #include "GPUFermat.h"
+#include "BestChinese.h"
+#include "ctr-evolution.h"
 
 using namespace std;
 
@@ -239,6 +241,51 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+  if (opts->has_calc_ctr() && 
+      opts->has_ctr_primes() &&
+      opts->has_ctr_merit() &&
+      opts->has_ctr_file() &&
+      !opts->has_ctr_evolution()) {
+
+    sieve_t bits = 256;
+    if (opts->has_ctr_bits())
+      bits += atoi(opts->get_ctr_bits().c_str());
+
+    sieve_t max_greedy = MAX_GREADY;
+
+    if (opts->has_ctr_strength())
+      max_greedy = atoi(opts->get_ctr_strength().c_str());
+
+    BestChinese bc(atoi(opts->get_ctr_primes().c_str()),
+                   atof(opts->get_ctr_merit().c_str()),
+                   bits,
+                   N_TEST,
+                   max_greedy);
+
+    bc.calc_best_residues(true);
+    exit(EXIT_SUCCESS);
+  }
+
+  if (opts->has_calc_ctr() && 
+      opts->has_ctr_primes() &&
+      opts->has_ctr_merit() &&
+      opts->has_ctr_file() &&
+      opts->has_ctr_evolution() &&
+      opts->has_ctr_n_ivs()) {
+      
+    sieve_t bits     = (opts->has_ctr_bits() ? 256 + atoi(opts->get_ctr_bits().c_str()) : 256);
+    sieve_t n_primes = atoi(opts->get_ctr_primes().c_str());
+    double  merit    = atof(opts->get_ctr_merit().c_str());
+    sieve_t fixed_len = (opts->has_ctr_fixed() ? atoi(opts->get_ctr_fixed().c_str()) : 10);
+    sieve_t n_ivs    = atoi(opts->get_ctr_n_ivs().c_str());
+    double  range    = (opts->has_ctr_range() ? atof(opts->get_ctr_range().c_str()) : 0);
+    sieve_t n_threads = (opts->has_threads() ? atoi(opts->get_threads().c_str()) : 1);
+
+    start_chinese_evolution(n_primes, merit, fixed_len, n_ivs, n_threads, range, bits);
+    exit(EXIT_SUCCESS);
+  }
+
+
   if (opts->has_help()  ||
       !opts->has_host() ||
       !opts->has_port() ||
@@ -252,6 +299,7 @@ int main(int argc, char *argv[]) {
 #ifndef WINDOWS
   init_signal();
 #endif
+
 
 
   /* 1 thread default */

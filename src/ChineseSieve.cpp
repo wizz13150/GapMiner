@@ -39,28 +39,6 @@ static bool compare_gap_candidate(GapCandidate *a, GapCandidate *b) {
   return a->n_candidates >= b->n_candidates;
 }
 
-/**
- * calculates the log from a mpz value
- * (double version for debugging)
- */
-static double mpz_log(mpz_t mpz) {
-  
-  mpfr_t mpfr_tmp;
-  mpfr_init_set_z(mpfr_tmp, mpz, MPFR_RNDD);
-  mpfr_log(mpfr_tmp, mpfr_tmp, MPFR_RNDD);
-  
-  double res = mpfr_get_d(mpfr_tmp, MPFR_RNDD);
-  mpfr_clear(mpfr_tmp);
- 
-  return res;
-}
-
-#if __WORDSIZE == 64
-#define popcount(X) __builtin_popcountl(X)
-#else
-#define popcount(X) __builtin_popcountll(X)
-#endif
-
 /* stores the found gaps in the form n * primorial, n_candidates */
 vector<GapCandidate *> ChineseSieve::gaps = vector<GapCandidate *>();
 
@@ -221,7 +199,7 @@ ChineseSieve::ChineseSieve(PoWProcessor *processor,
   this->avg_prime_candidates = 0.0;
   this->crt_status           = 0.000001;
   this->cur_merit            = 1.0;
-  this->rand = new_rand128_t(time(NULL) ^ getpid() ^ n_primes ^ sievesize);
+  this->rand = new_rand128(time(NULL) ^ getpid() ^ n_primes ^ sievesize);
 
   mpz_init(this->mpz_e);
   mpz_init(this->mpz_r);

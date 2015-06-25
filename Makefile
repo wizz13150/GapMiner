@@ -14,14 +14,14 @@ OTFLAGS   = -march=native -O3
 
 # default target
 all: link
-	$(CC) $(ALL_OBJ) $(LDFLAGS) -o $(BIN)/gapminer
+	$(CC) $(ALL_OBJ) $(EV_OBJ) $(LDFLAGS) -o $(BIN)/gapminer
 
 install: all
 	cp $(BIN)/gapminer /usr/bin/
 
 
 # development
-#CXXFLAGS += $(DBFLAGS) 
+CXXFLAGS += $(DBFLAGS) 
 
 # PoWCore debugging
 #CXXFLAGS += -D DEBUG
@@ -43,8 +43,10 @@ LDFLAGS   += $(OTFLAGS)
 CXXFLAGS += -DCPU_ONLY 
 LDFLAGS   = -lm -lcrypto -lmpfr -lgmp -pthread -lcurl -ljansson
 
+EV_SRC  = $(shell find $(SRC)/Evolution -type f -name '*.c'|grep -v -e test -e evolution.c)
+EV_OBJ  = $(EV_SRC:%.c=%.o) $(SRC)/Evolution/src/evolution-O3.o
 ALL_SRC = $(shell find $(SRC) -type f -name '*.cpp')
-ALL_OBJ = $(ALL_SRC:%.cpp=%.o)
+ALL_OBJ = $(ALL_SRC:%.cpp=%.o) 
 
 $(SRC)/GPUFermat.o:
 	$(CC) $(CXXFLAGS) -std=c++11  $(SRC)/GPUFermat.cpp -o  $(SRC)/GPUFermat.o
@@ -52,8 +54,10 @@ $(SRC)/GPUFermat.o:
 %.o: %.cpp
 	$(CC) $(CXXFLAGS) $^ -o $@
 
-compile: $(ALL_OBJ) $(ALL_OBJ)
+evolution:
+	$(MAKE) -C $(SRC)/Evolution evolution-O3
 
+compile: $(ALL_OBJ) $(ALL_OBJ) evolution
 
 prepare:
 	@mkdir -p bin
@@ -62,5 +66,6 @@ link: prepare compile
 
 clean:
 	rm -rf $(BIN)
-	rm -f $(ALL_OBJ) $(ALL_OBJ)
+	rm -f $(ALL_OBJ)
+	$(MAKE) -C $(SRC)/Evolution clean
 

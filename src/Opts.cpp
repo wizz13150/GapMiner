@@ -141,6 +141,16 @@ queue_size("-z", "--queue-size",     "the gpu waiting queue size (memory intensi
 platform(  "-a", "--platform",       "opencl platform (amd or nvidia)",               true),
 n_tests(   "-n", "--num-gpu-tests",  "the number of test per gap per gpu run",        true),
 #endif
+calc_ctr(  NULL, "--calc-ctr",       "calculate a chinese remainder theorem file",    false),
+ctr_strength(NULL, "--ctr-strength", "more = longer time and mybe better result",     true),
+ctr_primes(NULL, "--ctr-primes",     "the number of to use primes in the ctr file",   true),
+ctr_evolution(NULL, "--ctr-evolution",  "whether to use evolutional algorithm",       false),
+ctr_fixed( NULL, "--ctr-fixed" ,     "the number of fixed starting prime offsets",    true),
+ctr_n_ivs( NULL, "--ctr-ivs",        "the number of individuals used in the evolution", true),
+ctr_range( NULL, "--ctr-range" ,     "percent deviation from the number of primes",   true),
+ctr_bits(  NULL, "--ctr-bits",       "additional bits added to the primorial",        true),
+ctr_merit( NULL, "--ctr-merit",      "the target merit",                              true),
+ctr_file(  NULL, "--ctr-file",       "the target ctr file",                           true),
 help(      "-h", "--help",           "print this information",                        false),
 license(   "-v", "--license",        "show license of this program",                  false) {
        
@@ -228,6 +238,42 @@ license(   "-v", "--license",        "show license of this program",            
   if (n_tests.active)
     n_tests.arg = get_arg(n_tests.short_opt,  n_tests.long_opt);
 #endif    
+
+  calc_ctr.active = has_arg(calc_ctr.short_opt, calc_ctr.long_opt);
+
+  ctr_strength.active = has_arg(ctr_strength.short_opt, ctr_strength.long_opt);
+  if (ctr_strength.active)
+    ctr_strength.arg = get_arg(ctr_strength.short_opt, ctr_strength.long_opt);
+
+  ctr_primes.active = has_arg(ctr_primes.short_opt, ctr_primes.long_opt);
+  if (ctr_primes.active)
+    ctr_primes.arg = get_arg(ctr_primes.short_opt, ctr_primes.long_opt);
+
+  ctr_evolution.active = has_arg(ctr_evolution.short_opt, ctr_evolution.long_opt);
+
+  ctr_fixed.active = has_arg(ctr_fixed.short_opt, ctr_fixed.long_opt);
+  if (ctr_fixed.active)
+    ctr_fixed.arg = get_arg(ctr_fixed.short_opt, ctr_fixed.long_opt);
+
+  ctr_n_ivs.active = has_arg(ctr_n_ivs.short_opt, ctr_n_ivs.long_opt);
+  if (ctr_n_ivs.active)
+    ctr_n_ivs.arg = get_arg(ctr_n_ivs.short_opt, ctr_n_ivs.long_opt);
+
+  ctr_range.active = has_arg(ctr_range.short_opt, ctr_range.long_opt);
+  if (ctr_range.active)
+    ctr_range.arg = get_arg(ctr_range.short_opt, ctr_range.long_opt);
+
+  ctr_bits.active = has_arg(ctr_bits.short_opt, ctr_bits.long_opt);
+  if (ctr_bits.active)
+    ctr_bits.arg = get_arg(ctr_bits.short_opt, ctr_bits.long_opt);
+
+  ctr_merit.active = has_arg(ctr_merit.short_opt, ctr_merit.long_opt);
+  if (ctr_merit.active)
+    ctr_merit.arg = get_arg(ctr_merit.short_opt, ctr_merit.long_opt);
+
+  ctr_file.active = has_arg(ctr_file.short_opt, ctr_file.long_opt);
+  if (ctr_file.active)
+    ctr_file.arg = get_arg(ctr_file.short_opt, ctr_file.long_opt);
                                           
   help.active = has_arg(help.short_opt,  help.long_opt);
   license.active = has_arg(license.short_opt,  license.long_opt);
@@ -328,6 +374,36 @@ string Opts::get_help()  {
   ss << "  " << n_tests.short_opt  << "  " << left << setw(18);
   ss << n_tests.long_opt << "  " << n_tests.description << "\n\n";
 #endif  
+
+  ss << "      " << left << setw(18);
+  ss << calc_ctr.long_opt << "  " << calc_ctr.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_strength.long_opt << "  " << ctr_strength.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_primes.long_opt << "  " << ctr_primes.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_evolution.long_opt << "  " << ctr_evolution.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_fixed.long_opt << "  " << ctr_fixed.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_n_ivs.long_opt << "  " << ctr_n_ivs.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_range.long_opt << "  " << ctr_range.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_bits.long_opt << "  " << ctr_bits.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_merit.long_opt << "  " << ctr_merit.description << "\n\n";
+
+  ss << "      " << left << setw(18);
+  ss << ctr_file.long_opt << "  " << ctr_file.description << "\n\n";
 
   ss << "  " << help.short_opt << "  " << left << setw(18);
   ss << help.long_opt << "  " << help.description << "\n\n";

@@ -95,6 +95,16 @@ class Opts {
     SingleOpt platform;
     SingleOpt n_tests;
 #endif    
+    SingleOpt calc_ctr;
+    SingleOpt ctr_strength;
+    SingleOpt ctr_primes;
+    SingleOpt ctr_evolution;
+    SingleOpt ctr_fixed;
+    SingleOpt ctr_n_ivs;
+    SingleOpt ctr_range;
+    SingleOpt ctr_bits;
+    SingleOpt ctr_merit;
+    SingleOpt ctr_file;
     SingleOpt help;
     SingleOpt license;
 
@@ -178,6 +188,36 @@ class Opts {
     bool has_n_tests()          { return n_tests.active;        }
     string get_n_tests()        { return n_tests.arg;           }
 #endif    
+
+    bool has_calc_ctr()         { return calc_ctr.active;       }
+    string get_calc_ctr()       { return calc_ctr.arg;          }
+
+    bool has_ctr_strength()     { return ctr_strength.active;   }
+    string get_ctr_strength()   { return ctr_strength.arg;      }
+
+    bool has_ctr_primes()       { return ctr_primes.active;     }
+    string get_ctr_primes()     { return ctr_primes.arg;        }
+
+    bool has_ctr_evolution()    { return ctr_evolution.active;  }
+    string get_ctr_evolution()  { return ctr_evolution.arg;     }
+
+    bool has_ctr_fixed()        { return ctr_fixed.active;      }
+    string get_ctr_fixed()      { return ctr_fixed.arg;         }
+
+    bool has_ctr_n_ivs()        { return ctr_n_ivs.active;      }
+    string get_ctr_n_ivs()      { return ctr_n_ivs.arg;         }
+
+    bool has_ctr_range()        { return ctr_range.active;      }
+    string get_ctr_range()      { return ctr_range.arg;         }
+
+    bool has_ctr_bits()         { return ctr_bits.active;       }
+    string get_ctr_bits()       { return ctr_bits.arg;          }
+
+    bool has_ctr_merit()        { return ctr_merit.active;      }
+    string get_ctr_merit()      { return ctr_merit.arg;         }
+                                                  
+    bool has_ctr_file()         { return ctr_file.active;       }
+    string get_ctr_file()       { return ctr_file.arg;          }
                                                   
     bool has_help()             { return help.active;           }
                                                                 
