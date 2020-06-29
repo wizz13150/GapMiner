@@ -424,7 +424,7 @@ void GPUFermat::clBuffer::init(int size, cl_mem_flags flags) {
 }
 
 /* copy the clBuffer content to gpu */
-void GPUFermat::clBuffer::copyToDevice(cl_command_queue cq, bool blocking) {
+void GPUFermat::clBuffer::copyToDevice(cl_command_queue cq, bool blocking = true) {
   
   OCL(clEnqueueWriteBuffer(cq, DeviceData, blocking, 0, Size*sizeof(uint32_t), HostData, 0, 0, 0));
 }
